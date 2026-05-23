@@ -875,6 +875,8 @@ def evaluate_price_profile(
     damping_lambda: float = DEFAULT_DAMPING_LAMBDA,
     subsidy_budget_per_person: float = 0.0,
     subsidy_policy_label: str = "none",
+    enable_damping: bool = True,
+    choice_cache: Dict[str, Dict[str, CommunityStationChoiceCache]] | None = None,
 ) -> PriceEvaluation:
     populations = population_by_community(inputs.year5_population)
     stations = stations_by_community(inputs.q2_stations)
@@ -882,7 +884,7 @@ def evaluate_price_profile(
     satisfaction_rules = load_satisfaction_rules()
     low_income_set = low_income_communities()
     baseline_adjusted_summary = adjusted_demand_summary_map(inputs.adjusted_demand_summary)
-    choice_cache = precompute_community_station_choice_cache(
+    resolved_choice_cache = choice_cache or precompute_community_station_choice_cache(
         inputs=inputs,
         station_prices=station_prices,
         subsidy_budget_per_person=subsidy_budget_per_person,
@@ -915,7 +917,7 @@ def evaluate_price_profile(
             )
 
         choices = build_community_choices(
-            choice_cache=choice_cache,
+            choice_cache=resolved_choice_cache,
             response_by_station=response_by_station,
         )
         station_capacities = {station_name: station.daily_capacity for station_name, station in stations.items()}
@@ -934,7 +936,7 @@ def evaluate_price_profile(
             for station_name in stations
         }
         iteration_damping_used = 0
-        if detect_two_cycle_oscillation(satisfaction_history + [candidate_satisfaction]):
+        if enable_damping and detect_two_cycle_oscillation(satisfaction_history + [candidate_satisfaction]):
             new_satisfaction = apply_damping(
                 previous=old_satisfaction,
                 candidate=candidate_satisfaction,
