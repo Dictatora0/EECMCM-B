@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Sequence, Set
 import csv
 import json
+import math
 import sys
 
 
@@ -58,7 +59,7 @@ BASELINE_PARAMETERS = {
     "budget_limit": 120.0,
 }
 CAPACITY_SAFE_THRESHOLD = 0.85
-CACHE_VERSION = "rq4_scenarios_v3"
+CACHE_VERSION = "rq4_scenarios_v6"
 PARAMETER_ALIASES = {
     "elder_growth_rate": "elderly_growth_rate",
     "self_to_semi": "p12",
@@ -258,6 +259,43 @@ def write_json(path: Path, payload: Dict[str, object]) -> None:
 
 def read_json(path: Path) -> Dict[str, object]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def summarize_monte_carlo_metric(
+    name: str,
+    values: Sequence[float],
+    risk_threshold: float,
+    lower_is_risk: bool,
+) -> Dict[str, float | str]:
+    ordered = sorted(float(value) for value in values)
+    assert ordered, f"{name} requires at least one Monte Carlo sample"
+
+    def percentile(p: float) -> float:
+        if len(ordered) == 1:
+            return ordered[0]
+        position = (len(ordered) - 1) * p
+        lower = math.floor(position)
+        upper = math.ceil(position)
+        if lower == upper:
+            return ordered[lower]
+        weight = position - lower
+        return ordered[lower] * (1.0 - weight) + ordered[upper] * weight
+
+    mean = sum(ordered) / len(ordered)
+    if lower_is_risk:
+        risk_count = sum(1 for value in ordered if value < risk_threshold - 1e-12)
+    else:
+        risk_count = sum(1 for value in ordered if value > risk_threshold + 1e-12)
+    return {
+        "metric": name,
+        "mean": mean,
+        "min": ordered[0],
+        "p10": percentile(0.10),
+        "p50": percentile(0.50),
+        "p90": percentile(0.90),
+        "max": ordered[-1],
+        "risk_probability": risk_count / len(ordered),
+    }
 
 
 def station_location_set(q2_evaluation) -> Set[str]:

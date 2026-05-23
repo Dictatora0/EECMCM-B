@@ -29,6 +29,7 @@ compute_financial_compliance_rate = RQ4_COMMON.compute_financial_compliance_rate
 compute_capacity_safety_rate = RQ4_COMMON.compute_capacity_safety_rate
 build_station_scale_map = RQ4_COMMON.build_station_scale_map
 build_station_plan_text = RQ4_COMMON.build_station_plan_text
+summarize_monte_carlo_metric = RQ4_COMMON.summarize_monte_carlo_metric
 
 
 def test_scenario_config_contains_required_traceable_fields() -> None:
@@ -170,6 +171,19 @@ def test_station_plan_helpers_build_consistent_strings_and_maps() -> None:
     assert build_station_plan_text(scale_map) == plan
 
 
+def test_monte_carlo_metric_summary_reports_mean_quantiles_and_risk() -> None:
+    summary = summarize_monte_carlo_metric(
+        name="annual_net_profit",
+        values=[-10.0, 0.0, 10.0, 20.0, 30.0],
+        risk_threshold=0.0,
+        lower_is_risk=True,
+    )
+    assert summary["metric"] == "annual_net_profit"
+    assert summary["mean"] == 10.0
+    assert summary["p10"] <= summary["p50"] <= summary["p90"]
+    assert summary["risk_probability"] == 0.2
+
+
 def run_all_tests() -> None:
     tests = [
         test_scenario_config_contains_required_traceable_fields,
@@ -180,6 +194,7 @@ def run_all_tests() -> None:
         test_sensitivity_level_thresholds,
         test_robustness_helpers_follow_new_definitions,
         test_station_plan_helpers_build_consistent_strings_and_maps,
+        test_monte_carlo_metric_summary_reports_mean_quantiles_and_risk,
     ]
     for test in tests:
         test()

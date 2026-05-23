@@ -11,6 +11,7 @@ from common import (
     load_satisfaction_rules,
     load_service_costs,
     load_station_scales,
+    solve_location_milp,
     select_safe_scheme,
     sort_scheme_evaluations_safe,
     sort_scheme_evaluations,
@@ -149,17 +150,58 @@ def main(capacity_safety_threshold: float = SAFE_CAPACITY_THRESHOLD) -> None:
             evaluations.append(result)
 
     ranked = sort_scheme_evaluations(evaluations)
-    best = ranked[0]
+    baseline_best = ranked[0]
     safe_best, safe_threshold_used = select_safe_scheme(
         evaluations,
         capacity_safety_threshold=capacity_safety_threshold,
+    )
+    optimized_scheme_code = solve_location_milp(
+        communities=communities,
+        distance_matrix=distance_matrix,
+        scales=scales,
+        budget_limit=120.0,
+        fairness_weight=0.25,
+        safety_capacity_factor=0.85,
+    )
+    optimized_best = (
+        evaluate_scheme(
+            scheme_code=optimized_scheme_code,
+            communities=communities,
+            distance_matrix=distance_matrix,
+            scales=scales,
+            satisfaction_rules=satisfaction_rules,
+            service_costs=service_costs,
+        )
+        if optimized_scheme_code is not None
+        else None
+    )
+    robust_scheme_code = solve_location_milp(
+        communities=communities,
+        distance_matrix=distance_matrix,
+        scales=scales,
+        budget_limit=120.0,
+        fairness_weight=0.35,
+        safety_capacity_factor=0.75,
+    )
+    robust_best = (
+        evaluate_scheme(
+            scheme_code=robust_scheme_code,
+            communities=communities,
+            distance_matrix=distance_matrix,
+            scales=scales,
+            satisfaction_rules=satisfaction_rules,
+            service_costs=service_costs,
+        )
+        if robust_scheme_code is not None
+        else None
     )
 
     top_output = OUTPUT_DIR / "2_1_top10_schemes.csv"
     compare_output = OUTPUT_DIR / "2_1_dual_scheme_compare.csv"
     tradeoff_output = OUTPUT_DIR / "2_1_safety_threshold_tradeoff.csv"
+    model_compare_output = OUTPUT_DIR / "2_1_model_upgrade_compare.csv"
 
-    write_scheme_bundle("2_1_best_scheme", best, {"scheme_type": "coverage_priority"})
+    write_scheme_bundle("2_1_best_scheme", baseline_best, {"scheme_type": "coverage_priority_baseline"})
     write_scheme_bundle(
         "2_1_safe_scheme",
         safe_best,
@@ -168,14 +210,40 @@ def main(capacity_safety_threshold: float = SAFE_CAPACITY_THRESHOLD) -> None:
             "capacity_safety_threshold_used": round(safe_threshold_used, 6),
         },
     )
+    if optimized_best is not None:
+        write_scheme_bundle(
+            "2_1_optimized_scheme",
+            optimized_best,
+            {
+                "scheme_type": "milp_multiobjective",
+                "model_name": "coverage_fairness_capacity_milp",
+            },
+        )
+        write_scheme_bundle(
+            "2_1_best_scheme",
+            optimized_best,
+            {
+                "scheme_type": "coverage_fairness_capacity_milp",
+                "model_name": "coverage_fairness_capacity_milp",
+            },
+        )
+    if robust_best is not None:
+        write_scheme_bundle(
+            "2_1_robust_scheme",
+            robust_best,
+            {
+                "scheme_type": "robust_capacity_priority",
+                "model_name": "robust_milp",
+            },
+        )
     write_csv(top_output, [evaluation_to_summary_row(item) for item in ranked[:10]])
     write_csv(
         compare_output,
         [
             {
-                "scheme_type": "coverage_priority",
+                "scheme_type": "coverage_priority_baseline",
                 "capacity_safety_threshold_used": "",
-                **evaluation_to_summary_row(best),
+                **evaluation_to_summary_row(baseline_best),
             },
             {
                 "scheme_type": "safety_priority",
@@ -184,6 +252,31 @@ def main(capacity_safety_threshold: float = SAFE_CAPACITY_THRESHOLD) -> None:
             },
         ],
     )
+    model_compare_rows = [
+        {
+            "model_variant": "baseline_enumeration",
+            **evaluation_to_summary_row(baseline_best),
+        },
+        {
+            "model_variant": "safe_baseline",
+            **evaluation_to_summary_row(safe_best),
+        },
+    ]
+    if optimized_best is not None:
+        model_compare_rows.append(
+            {
+                "model_variant": "milp_multiobjective",
+                **evaluation_to_summary_row(optimized_best),
+            }
+        )
+    if robust_best is not None:
+        model_compare_rows.append(
+            {
+                "model_variant": "robust_milp",
+                **evaluation_to_summary_row(robust_best),
+            }
+        )
+    write_csv(model_compare_output, model_compare_rows)
     tradeoff_rows = []
     for threshold in SAFE_CAPACITY_THRESHOLD_GRID:
         picked, used = select_safe_scheme(evaluations, capacity_safety_threshold=threshold)
@@ -203,9 +296,9 @@ def main(capacity_safety_threshold: float = SAFE_CAPACITY_THRESHOLD) -> None:
     print(f"Saved safety-threshold tradeoff table to {tradeoff_output}")
     print(
         "Validation: "
-        f"served coverage(pop)={best.served_population_coverage:.6f}, "
-        f"served coverage(demand)={best.served_demand_coverage:.6f}, "
-        f"avg service satisfaction={best.average_service_satisfaction:.6f}; "
+        f"served coverage(pop)={baseline_best.served_population_coverage:.6f}, "
+        f"served coverage(demand)={baseline_best.served_demand_coverage:.6f}, "
+        f"avg service satisfaction={baseline_best.average_service_satisfaction:.6f}; "
         f"safe capacity rate={safe_best.capacity_safety_rate:.6f}"
     )
 

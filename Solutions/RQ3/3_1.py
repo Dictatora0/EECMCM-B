@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from itertools import combinations, product
 from typing import Dict, List
+import argparse
+import math
 from scipy.optimize import linprog
 
 from common import (
@@ -42,7 +44,18 @@ EARLY_STOP_NEGATIVE_PROFIT_MARGIN = -0.05
 PRICE_PREMIUM_MULTIPLIERS = [1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.8, 2.0]
 RESCUE_NEAR_FEASIBLE_TOP_K = 16
 RESCUE_OVERALL_TOP_K = 8
-MAX_RESCUE_CANDIDATES = 480
+MAX_RESCUE_CANDIDATES = 96
+DEFAULT_TARGETED_SUBSIDY_BUDGET_PER_PERSON = 6.0
+LOW_INCOME_SUBSIDY_WEIGHT = 0.4
+VULNERABLE_SUBSIDY_WEIGHT = 0.6
+SERVICE_PRIORITY_WEIGHTS = {
+    "助餐": 0.5,
+    "日间照料": 0.4,
+    "上门护理": 0.8,
+    "康复理疗": 0.7,
+    "助浴": 0.9,
+    "紧急救助": 0.0,
+}
 
 
 @dataclass(frozen=True)
@@ -55,7 +68,7 @@ class IterationRecord:
     damping_used: int = 0
 
 
-@dataclass(frozen=True)
+@dataclass
 class PriceEvaluation:
     station_prices: Dict[str, Dict[str, float]]
     iteration_count: int
@@ -87,6 +100,11 @@ class PriceEvaluation:
     weighted_served_population_coverage: float = 0.0
     served_demand_coverage: float = 0.0
     damping_used: int = 0
+    pareto_rank: int = 0
+    subsidy_policy_label: str = "none"
+    gini_access: float = 0.0
+    theil_access: float = 0.0
+    max_min_gap: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -104,6 +122,81 @@ class CommunityChoice:
 class RescueCandidate:
     station_prices: Dict[str, Dict[str, float]]
     warm_start_satisfaction: Dict[str, float]
+    subsidy_budget_per_person: float = 0.0
+    subsidy_policy_label: str = "none"
+
+
+@dataclass(frozen=True)
+class CommunityStationChoiceCache:
+    distance_satisfaction: float
+    demand_by_service: Dict[str, float]
+    price_satisfaction: float
+
+
+def apply_targeted_subsidy_policy(
+    community: str,
+    service: str,
+    posted_price: float,
+    low_income_communities: set[str],
+    vulnerable_weight: float,
+    low_income_weight: float,
+    service_priority: Dict[str, float],
+    subsidy_budget_per_person: float,
+    is_vulnerable: bool,
+) -> float:
+    if posted_price <= 0 or service == "紧急救助" or subsidy_budget_per_person <= 0:
+        return 0.0
+    score = service_priority.get(service, 0.0)
+    if community in low_income_communities:
+        score += low_income_weight
+    if is_vulnerable:
+        score += vulnerable_weight
+    if score <= 0:
+        return 0.0
+    raw_subsidy = subsidy_budget_per_person * min(1.0, score / (vulnerable_weight + low_income_weight + 1.0))
+    return min(posted_price, raw_subsidy)
+
+
+def compute_equity_metrics(
+    community_rows: List[Dict[str, float]],
+    population_weights: Dict[str, float],
+) -> Dict[str, float]:
+    weighted_values: List[tuple[float, float]] = []
+    for row in community_rows:
+        community = row["community"]
+        weight = max(float(population_weights.get(community, 0.0)), 0.0)
+        if weight <= 0:
+            continue
+        weighted_values.append((float(row["service_access_performance"]), weight))
+    if not weighted_values:
+        return {"gini_access": 0.0, "theil_access": 0.0, "max_min_gap": 0.0}
+
+    expanded: List[tuple[float, float]] = sorted(weighted_values, key=lambda item: item[0])
+    total_weight = sum(weight for _, weight in expanded)
+    mean = sum(value * weight for value, weight in expanded) / max(total_weight, 1e-12)
+    if mean <= 1e-12:
+        return {"gini_access": 0.0, "theil_access": 0.0, "max_min_gap": max(value for value, _ in expanded)}
+
+    gini_sum = 0.0
+    for i, (value_i, weight_i) in enumerate(expanded):
+        for value_j, weight_j in expanded[i + 1:]:
+            gini_sum += abs(value_i - value_j) * weight_i * weight_j
+    gini = gini_sum * 2.0 / max(total_weight * total_weight * mean, 1e-12)
+
+    theil = 0.0
+    for value, weight in expanded:
+        if value <= 1e-12:
+            continue
+        ratio = value / mean
+        theil += weight * ratio * math.log(ratio)
+    theil /= max(total_weight, 1e-12)
+
+    values = [value for value, _ in expanded]
+    return {
+        "gini_access": gini,
+        "theil_access": theil,
+        "max_min_gap": max(values) - min(values),
+    }
 
 
 def enumerate_station_price_profiles(inputs: RQ3Inputs) -> List[Dict[str, Dict[str, float]]]:
@@ -245,6 +338,11 @@ def generate_rescue_price_profiles(
                     row["community"]: row["service_satisfaction"]
                     for row in source.community_results
                 },
+                subsidy_budget_per_person=max(
+                    0.0,
+                    float(source.subsidy_policy_label.rsplit("_", 1)[-1]) if source.subsidy_policy_label.startswith("targeted_subsidy_") else 0.0,
+                ),
+                subsidy_policy_label=source.subsidy_policy_label,
             )
         )
         return len(rescue_candidates) < max_candidates
@@ -335,6 +433,58 @@ def generate_rescue_price_profiles(
                     return rescue_candidates
 
     return rescue_candidates
+
+
+def subsidy_budget_candidates() -> List[float]:
+    return [0.0, 1.0, 2.0]
+
+
+def assign_pareto_ranks(evaluations: List[PriceEvaluation]) -> List[PriceEvaluation]:
+    def dominates(left: PriceEvaluation, right: PriceEvaluation) -> bool:
+        no_worse = (
+            left.average_service_access_performance >= right.average_service_access_performance - 1e-9
+            and left.profit_rate >= right.profit_rate - 1e-9
+            and left.gini_access <= right.gini_access + 1e-9
+        )
+        strictly_better = (
+            left.average_service_access_performance > right.average_service_access_performance + 1e-9
+            or left.profit_rate > right.profit_rate + 1e-9
+            or left.gini_access < right.gini_access - 1e-9
+        )
+        return no_worse and strictly_better
+
+    dominated_count = {id(item): 0 for item in evaluations}
+    dominates_map = {id(item): [] for item in evaluations}
+    current_front: List[PriceEvaluation] = []
+
+    for item in evaluations:
+        for other in evaluations:
+            if other is item:
+                continue
+            if dominates(item, other):
+                dominates_map[id(item)].append(other)
+            elif dominates(other, item):
+                dominated_count[id(item)] += 1
+        if dominated_count[id(item)] == 0:
+            item.pareto_rank = 1
+            current_front.append(item)
+
+    rank = 1
+    while current_front:
+        next_front: List[PriceEvaluation] = []
+        for item in current_front:
+            for dominated_item in dominates_map[id(item)]:
+                dominated_count[id(dominated_item)] -= 1
+                if dominated_count[id(dominated_item)] == 0:
+                    dominated_item.pareto_rank = rank + 1
+                    next_front.append(dominated_item)
+        rank += 1
+        current_front = next_front
+
+    for item in evaluations:
+        if item.pareto_rank <= 0:
+            item.pareto_rank = rank
+    return evaluations
 
 
 def compute_price_satisfaction(base_price: float, actual_price: float) -> float:
@@ -470,14 +620,33 @@ def compute_price_adjusted_monthly_demand_for_station(
     community: str,
     station_price_vector: Dict[str, float],
     detail_map: Dict[str, Dict[str, Dict[str, object]]],
+    low_income_set: set[str] | None = None,
+    subsidy_budget_per_person: float = 0.0,
 ) -> Dict[str, float]:
     result = {service: 0.0 for service in SERVICE_ORDER}
     community_details = detail_map[community]
+    low_income_communities_set = low_income_set or set()
     for care_level in CARE_LEVEL_ORDER:
         rows_by_service = community_details[care_level]
         budget_limit = rows_by_service["助餐"].budget_limit
+        is_vulnerable = care_level in {"半失能", "失能"}
+        net_price_by_service = {}
+        for service in SERVICE_ORDER:
+            posted_price = station_price_vector[service]
+            subsidy = apply_targeted_subsidy_policy(
+                community=community,
+                service=service,
+                posted_price=posted_price,
+                low_income_communities=low_income_communities_set,
+                vulnerable_weight=VULNERABLE_SUBSIDY_WEIGHT,
+                low_income_weight=LOW_INCOME_SUBSIDY_WEIGHT,
+                service_priority=SERVICE_PRIORITY_WEIGHTS,
+                subsidy_budget_per_person=subsidy_budget_per_person,
+                is_vulnerable=is_vulnerable,
+            )
+            net_price_by_service[service] = max(0.0, posted_price - subsidy)
         theoretical_fee = sum(
-            rows_by_service[service].theoretical_per_person * station_price_vector[service]
+            rows_by_service[service].theoretical_per_person * net_price_by_service[service]
             for service in SERVICE_ORDER
             if service != "紧急救助"
         )
@@ -621,48 +790,65 @@ def solve_collaboration_lp(
     return community_rows, station_raw, station_effective
 
 
-def build_community_choices(
+def precompute_community_station_choice_cache(
     inputs: RQ3Inputs,
     station_prices: Dict[str, Dict[str, float]],
-    response_by_station: Dict[str, float],
-) -> List[CommunityChoice]:
+    subsidy_budget_per_person: float = 0.0,
+) -> Dict[str, Dict[str, CommunityStationChoiceCache]]:
     distance_matrix = load_distance_matrix()
     satisfaction_rules = load_satisfaction_rules()
     detail_map = adjusted_demand_detail_map(inputs.adjusted_demand_detail)
     station_names = [station.station_community for station in inputs.q2_stations]
     base_prices = base_price_by_service()
+    low_income_set = low_income_communities()
 
-    choices: List[CommunityChoice] = []
+    cache: Dict[str, Dict[str, CommunityStationChoiceCache]] = {}
     for community in sorted(detail_map):
-        utility_by_station: Dict[str, float] = {}
-        demand_by_station: Dict[str, Dict[str, float]] = {}
-        price_satisfaction_by_station: Dict[str, float] = {}
+        station_cache: Dict[str, CommunityStationChoiceCache] = {}
         for station_name in station_names:
             distance = distance_matrix[community][station_name]
-            s1 = distance_satisfaction(distance, satisfaction_rules["distance"])
-            if s1 <= 0:
+            distance_score = distance_satisfaction(distance, satisfaction_rules["distance"])
+            if distance_score <= 0:
                 continue
             demand_by_service = compute_price_adjusted_monthly_demand_for_station(
                 community=community,
                 station_price_vector=station_prices[station_name],
                 detail_map=detail_map,
+                low_income_set=low_income_set,
+                subsidy_budget_per_person=subsidy_budget_per_person,
             )
-            s3 = compute_weighted_price_satisfaction_for_community(
+            price_score = compute_weighted_price_satisfaction_for_community(
                 demand_by_service=demand_by_service,
                 station_price_vector=station_prices[station_name],
                 base_prices=base_prices,
             )
-            demand_by_station[station_name] = demand_by_service
-            price_satisfaction_by_station[station_name] = s3
+            station_cache[station_name] = CommunityStationChoiceCache(
+                distance_satisfaction=distance_score,
+                demand_by_service=demand_by_service,
+                price_satisfaction=price_score,
+            )
+        cache[community] = station_cache
+    return cache
+
+
+def build_community_choices(
+    choice_cache: Dict[str, Dict[str, CommunityStationChoiceCache]],
+    response_by_station: Dict[str, float],
+) -> List[CommunityChoice]:
+    choices: List[CommunityChoice] = []
+    for community in sorted(choice_cache):
+        utility_by_station: Dict[str, float] = {}
+        for station_name, station_cache in choice_cache[community].items():
             utility_by_station[station_name] = (
-                SATISFACTION_WEIGHTS["distance"] * s1
+                SATISFACTION_WEIGHTS["distance"] * station_cache.distance_satisfaction
                 + SATISFACTION_WEIGHTS["response"] * response_by_station[station_name]
-                + SATISFACTION_WEIGHTS["price"] * s3
+                + SATISFACTION_WEIGHTS["price"] * station_cache.price_satisfaction
             )
 
         primary, backup = select_primary_and_backup(utility_by_station)
         if primary is None:
             continue
+        primary_cache = choice_cache[community][primary]
         choices.append(
             CommunityChoice(
                 community=community,
@@ -671,10 +857,10 @@ def build_community_choices(
                 utility_primary=utility_by_station[primary],
                 utility_backup=utility_by_station[backup] if backup is not None else 0.0,
                 demand_by_service={
-                    service: demand_by_station[primary][service] / DAYS_PER_MONTH
+                    service: primary_cache.demand_by_service[service] / DAYS_PER_MONTH
                     for service in SERVICE_ORDER
                 },
-                price_satisfaction_primary=price_satisfaction_by_station[primary],
+                price_satisfaction_primary=primary_cache.price_satisfaction,
             )
         )
     return choices
@@ -687,6 +873,8 @@ def evaluate_price_profile(
     epsilon: float = FIXED_POINT_EPSILON,
     initial_satisfaction: Dict[str, float] | None = None,
     damping_lambda: float = DEFAULT_DAMPING_LAMBDA,
+    subsidy_budget_per_person: float = 0.0,
+    subsidy_policy_label: str = "none",
 ) -> PriceEvaluation:
     populations = population_by_community(inputs.year5_population)
     stations = stations_by_community(inputs.q2_stations)
@@ -694,6 +882,11 @@ def evaluate_price_profile(
     satisfaction_rules = load_satisfaction_rules()
     low_income_set = low_income_communities()
     baseline_adjusted_summary = adjusted_demand_summary_map(inputs.adjusted_demand_summary)
+    choice_cache = precompute_community_station_choice_cache(
+        inputs=inputs,
+        station_prices=station_prices,
+        subsidy_budget_per_person=subsidy_budget_per_person,
+    )
 
     old_satisfaction = initial_satisfaction or initial_service_satisfaction_by_community(inputs.q2_allocations)
     satisfaction_history: List[Dict[str, float]] = [old_satisfaction.copy()]
@@ -703,23 +896,26 @@ def evaluate_price_profile(
     final_station_net_profits: Dict[str, float] = {}
     final_station_total_costs: Dict[str, float] = {}
     damping_used = 0
+    state_station_total_load = {
+        station_name: max(0.0, float(station.total_load))
+        for station_name, station in stations.items()
+    }
 
     for iteration in range(1, max_iterations + 1):
         response_by_station = {}
         for station_name, station in stations.items():
-            if iteration == 1:
-                utilization = station.utilization
-            else:
-                prev_raw = sum(station_raw_demand[station_name].values())
-                utilization = prev_raw / station.daily_capacity if station.daily_capacity > 0 else 1.0
+            utilization = (
+                state_station_total_load[station_name] / station.daily_capacity
+                if station.daily_capacity > 0
+                else 1.0
+            )
             response_by_station[station_name] = response_satisfaction_from_utilization(
                 utilization,
                 satisfaction_rules["response"],
             )
 
         choices = build_community_choices(
-            inputs=inputs,
-            station_prices=station_prices,
+            choice_cache=choice_cache,
             response_by_station=response_by_station,
         )
         station_capacities = {station_name: station.daily_capacity for station_name, station in stations.items()}
@@ -733,15 +929,30 @@ def evaluate_price_profile(
             community: community_results_map.get(community, {}).get("service_satisfaction", 0.0)
             for community in old_satisfaction
         }
+        candidate_station_total_load = {
+            station_name: sum(station_raw_demand[station_name].values())
+            for station_name in stations
+        }
+        iteration_damping_used = 0
         if detect_two_cycle_oscillation(satisfaction_history + [candidate_satisfaction]):
             new_satisfaction = apply_damping(
                 previous=old_satisfaction,
                 candidate=candidate_satisfaction,
                 damping_lambda=damping_lambda,
             )
+            state_station_total_load = apply_damping(
+                previous=state_station_total_load,
+                candidate=candidate_station_total_load,
+                damping_lambda=damping_lambda,
+            )
             damping_used = 1
+            iteration_damping_used = 1
         else:
             new_satisfaction = candidate_satisfaction
+            state_station_total_load = {
+                station_name: float(candidate_station_total_load[station_name])
+                for station_name in candidate_station_total_load
+            }
 
         community_choice_map = {choice.community: choice for choice in choices}
         for row in community_results:
@@ -868,7 +1079,7 @@ def evaluate_price_profile(
                 average_service_satisfaction=average_service_satisfaction,
                 feasible_station_count=feasible_station_count,
                 total_subsidy=total_subsidy,
-                damping_used=damping_used,
+                damping_used=iteration_damping_used,
             )
         )
         if iteration >= 3:
@@ -1011,6 +1222,10 @@ def evaluate_price_profile(
             "key_factor": "收入约束更强，对补贴与定价更敏感",
         },
     ]
+    equity_metrics = compute_equity_metrics(
+        community_rows=community_results,
+        population_weights={community: item.elderly_total for community, item in populations.items()},
+    )
 
     return PriceEvaluation(
         station_prices=station_prices,
@@ -1043,54 +1258,69 @@ def evaluate_price_profile(
         station_financials=station_financials,
         community_results=community_results,
         accessibility_groups=accessibility_groups,
+        subsidy_policy_label=subsidy_policy_label,
+        gini_access=equity_metrics["gini_access"],
+        theil_access=equity_metrics["theil_access"],
+        max_min_gap=equity_metrics["max_min_gap"],
     )
 
 
 def sort_price_evaluations(evaluations: List[PriceEvaluation]) -> List[PriceEvaluation]:
+    assign_pareto_ranks(evaluations)
     return sorted(
         evaluations,
         key=lambda item: (
-            item.profit_compliant,
-            item.feasible_station_count,
-            item.fair_satisfaction_compliant,
-            item.vulnerable_service_satisfaction,
-            item.average_service_satisfaction,
-            -item.annual_government_subsidy,
+            -item.profit_compliant,
+            -item.converged,
+            item.pareto_rank,
+            -item.feasible_station_count,
+            -item.fair_satisfaction_compliant,
+            item.gini_access,
+            item.max_min_gap,
+            -item.average_service_access_performance,
+            -item.vulnerable_service_satisfaction,
+            -item.average_service_satisfaction,
+            item.annual_government_subsidy,
         ),
-        reverse=True,
     )
 
 
 def sort_financial_compliant_evaluations(evaluations: List[PriceEvaluation]) -> List[PriceEvaluation]:
+    assign_pareto_ranks(evaluations)
     return sorted(
         evaluations,
         key=lambda item: (
-            item.profit_compliant,
-            item.feasible_station_count,
-            item.fair_satisfaction_compliant,
-            item.vulnerable_service_satisfaction,
-            item.average_service_satisfaction,
-            item.minimum_service_satisfaction,
-            -item.annual_government_subsidy,
+            -item.profit_compliant,
+            -item.converged,
+            item.pareto_rank,
+            -item.feasible_station_count,
+            -item.fair_satisfaction_compliant,
+            -item.profit_rate,
+            item.gini_access,
+            -item.vulnerable_service_satisfaction,
+            -item.average_service_access_performance,
+            item.annual_government_subsidy,
         ),
-        reverse=True,
     )
 
 
 def sort_fairness_priority_evaluations(evaluations: List[PriceEvaluation]) -> List[PriceEvaluation]:
+    assign_pareto_ranks(evaluations)
     return sorted(
         evaluations,
         key=lambda item: (
-            item.fair_satisfaction_compliant,
-            item.minimum_service_satisfaction,
-            item.vulnerable_service_satisfaction,
-            item.average_service_satisfaction,
-            item.low_income_service_satisfaction,
-            item.profit_compliant,
-            item.feasible_station_count,
-            -item.annual_government_subsidy,
+            -item.fair_satisfaction_compliant,
+            item.pareto_rank,
+            item.gini_access,
+            item.max_min_gap,
+            -item.minimum_service_access_performance,
+            -item.low_income_service_satisfaction,
+            -item.vulnerable_service_satisfaction,
+            -item.average_service_access_performance,
+            -item.converged,
+            -item.profit_compliant,
+            item.annual_government_subsidy,
         ),
-        reverse=True,
     )
 
 
@@ -1116,6 +1346,8 @@ def evaluation_summary_row(item: PriceEvaluation) -> Dict[str, object]:
         "price_scheme_detail": ";".join(station_labels),
         "pricing_model": "station_level_uniform_premium",
         "pricing_formula": "p_{j,r}=alpha_j*p_r^0,r=1,...,5; p_{j,6}=0",
+        "subsidy_policy": item.subsidy_policy_label,
+        "pareto_rank": item.pareto_rank,
         "iteration_count": item.iteration_count,
         "iterations": item.iteration_count,
         "converged": item.converged,
@@ -1132,6 +1364,9 @@ def evaluation_summary_row(item: PriceEvaluation) -> Dict[str, object]:
         "low_income_served_coverage": round(item.low_income_served_coverage, 6),
         "weighted_served_population_coverage": round(item.weighted_served_population_coverage, 6),
         "served_demand_coverage": round(item.served_demand_coverage, 6),
+        "gini_access": round(item.gini_access, 6),
+        "theil_access": round(item.theil_access, 6),
+        "max_min_gap": round(item.max_min_gap, 6),
         "annual_government_subsidy": round(item.annual_government_subsidy, 2),
         "annual_service_revenue": round(item.annual_service_revenue, 2),
         "annual_direct_cost": round(item.annual_direct_cost, 2),
@@ -1216,25 +1451,65 @@ def scheme_comparison_row(
     }
 
 
+def unique_frontier_rows(ranked_evaluations: List[PriceEvaluation]) -> List[Dict[str, object]]:
+    rows: List[Dict[str, object]] = []
+    seen_metric_signatures: set[tuple[object, ...]] = set()
+    for item in ranked_evaluations:
+        if item.pareto_rank != 1:
+            continue
+        row = evaluation_summary_row(item)
+        signature = (
+            row["subsidy_policy"],
+            row["profit_rate"],
+            row["average_service_access_performance"],
+            row["minimum_service_access_performance"],
+            row["gini_access"],
+            row["theil_access"],
+            row["max_min_gap"],
+            row["converged"],
+            row["profit_compliant"],
+            row["fair_satisfaction_compliant"],
+        )
+        if signature in seen_metric_signatures:
+            continue
+        seen_metric_signatures.add(signature)
+        rows.append(row)
+    return rows
+
+
 def evaluate_candidate_profiles(
     inputs: RQ3Inputs,
     candidate_profiles: List[Dict[str, Dict[str, float]]],
     initial_warm_start: Dict[str, float] | None = None,
 ) -> List[PriceEvaluation]:
     evaluations: List[PriceEvaluation] = []
-    warm_start_satisfaction = initial_warm_start
-    for profile in candidate_profiles:
-        evaluation = evaluate_price_profile(
-            inputs,
-            profile,
-            initial_satisfaction=warm_start_satisfaction,
-        )
-        evaluations.append(evaluation)
-        warm_start_satisfaction = {
-            row["community"]: row["service_satisfaction"]
-            for row in evaluation.community_results
-        }
+    for subsidy_budget in subsidy_budget_candidates():
+        warm_start_satisfaction = initial_warm_start
+        for profile in candidate_profiles:
+            evaluation = evaluate_price_profile(
+                inputs,
+                profile,
+                initial_satisfaction=warm_start_satisfaction,
+                subsidy_budget_per_person=subsidy_budget,
+                subsidy_policy_label=f"targeted_subsidy_{subsidy_budget:.1f}",
+            )
+            evaluations.append(evaluation)
+            warm_start_satisfaction = {
+                row["community"]: row["service_satisfaction"]
+                for row in evaluation.community_results
+            }
     return evaluations
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Solve RQ3 pricing/subsidy model.")
+    parser.add_argument(
+        "--max-candidate-profiles",
+        type=int,
+        default=None,
+        help="Optional cap on enumerated station price profiles for faster reproducible reruns.",
+    )
+    return parser.parse_args()
 
 
 def main(max_candidate_profiles: int | None = None) -> None:
@@ -1255,6 +1530,8 @@ def main(max_candidate_profiles: int | None = None) -> None:
                     inputs,
                     candidate.station_prices,
                     initial_satisfaction=candidate.warm_start_satisfaction,
+                    subsidy_budget_per_person=candidate.subsidy_budget_per_person,
+                    subsidy_policy_label=candidate.subsidy_policy_label,
                 )
             )
 
@@ -1270,6 +1547,10 @@ def main(max_candidate_profiles: int | None = None) -> None:
     write_csv(
         OUTPUT_DIR / "3_1_top_price_schemes.csv",
         [evaluation_summary_row(item) for item in ranked[:10]],
+    )
+    write_csv(
+        OUTPUT_DIR / "3_1_pareto_frontier.csv",
+        unique_frontier_rows(ranked),
     )
     write_csv(
         OUTPUT_DIR / "3_1_dual_scheme_comparison.csv",
@@ -1343,4 +1624,5 @@ def main(max_candidate_profiles: int | None = None) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+    main(max_candidate_profiles=args.max_candidate_profiles)

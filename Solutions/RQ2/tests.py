@@ -15,6 +15,8 @@ from common import (
     distance_satisfaction,
     evaluate_scheme,
     response_satisfaction,
+    scheme_profit_compliance,
+    solve_location_milp,
     select_safe_scheme,
     sort_scheme_evaluations_safe,
     sort_scheme_evaluations,
@@ -261,6 +263,47 @@ def test_evaluate_scheme_respects_custom_budget_limit() -> None:
     ) is not None
 
 
+def test_scheme_profit_compliance_requires_all_station_flags() -> None:
+    metrics = [
+        StationMetrics("A", "小型", 1000, 10, 0, 10, 0.01, 1000, 800, 730000, 9000, 0, -738800, -738800, annual_revenue=1000, annual_subsidy=200, annual_total_cost=1200, annual_net_profit=0, profit_rate=0.0, profit_compliant=1),
+        StationMetrics("B", "小型", 1000, 10, 0, 10, 0.01, 1000, 800, 730000, 9000, 0, -738800, -738800, annual_revenue=1000, annual_subsidy=200, annual_total_cost=1200, annual_net_profit=-10, profit_rate=-0.01, profit_compliant=0),
+    ]
+    assert scheme_profit_compliance(metrics) == 0
+
+
+def test_solve_location_milp_returns_budget_feasible_layout() -> None:
+    communities = [
+        CommunityDemand(
+            community=name,
+            elderly_population=100.0,
+            adjusted_monthly_demand={service: (60.0 if service == "助餐" else 0.0) for service in SERVICE_ORDER},
+        )
+        for name in ["A", "B", "C"]
+    ]
+    distance_matrix = {
+        "A": {"A": 0.0, "B": 150.0, "C": 900.0},
+        "B": {"A": 150.0, "B": 0.0, "C": 180.0},
+        "C": {"A": 900.0, "B": 180.0, "C": 0.0},
+    }
+    scales = {
+        "小型": StationScale("小型", 18.0, 2000.0, 3.0),
+        "中型": StationScale("中型", 32.0, 3200.0, 6.0),
+        "大型": StationScale("大型", 45.0, 4400.0, 9.0),
+    }
+    scheme_code = solve_location_milp(
+        communities=communities,
+        distance_matrix=distance_matrix,
+        scales=scales,
+        budget_limit=50.0,
+        fairness_weight=0.2,
+        safety_capacity_factor=0.85,
+    )
+    assert scheme_code is not None
+    assert len(scheme_code) == 3
+    spent = sum({1: 18.0, 2: 32.0, 3: 45.0}.get(token, 0.0) for token in scheme_code)
+    assert spent <= 50.0 + 1e-9
+
+
 def run_all_tests() -> None:
     tests = [
         test_distance_satisfaction_respects_radius_limit,
@@ -276,6 +319,8 @@ def run_all_tests() -> None:
         test_primary_station_always_prefers_highest_satisfaction_choice,
         test_overflow_station_skips_primary_and_zero_capacity_station,
         test_evaluate_scheme_respects_custom_budget_limit,
+        test_scheme_profit_compliance_requires_all_station_flags,
+        test_solve_location_milp_returns_budget_feasible_layout,
     ]
     for test in tests:
         test()

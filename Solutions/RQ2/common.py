@@ -3,10 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from importlib.util import module_from_spec, spec_from_file_location
 import json
+import math
 from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
 import csv
 import sys
+import numpy as np
+from scipy.optimize import Bounds, LinearConstraint, milp
 
 
 RQ2_DIR = Path(__file__).resolve().parent
@@ -45,6 +48,7 @@ OVERFLOW_PENALTY = 0.08
 MOVABLE_SERVICES = {"助餐", "日间照料", "上门护理", "康复理疗", "助浴"}
 SAFE_CAPACITY_THRESHOLD = 0.50
 SAFE_CAPACITY_THRESHOLD_GRID = [0.25, 0.50, 0.75, 1.00]
+MILP_TOLERANCE = 1e-6
 
 
 @dataclass(frozen=True)
@@ -461,6 +465,169 @@ def total_build_cost(stations: List[CandidateStation]) -> float:
     return sum(station.build_cost_wan for station in stations)
 
 
+def scheme_profit_compliance(station_metrics: List[StationMetrics]) -> int:
+    if not station_metrics:
+        return 0
+    return int(all(metric.profit_compliant == 1 for metric in station_metrics))
+
+
+def solve_location_milp(
+    communities: List[CommunityDemand],
+    distance_matrix: Dict[str, Dict[str, float]],
+    scales: Dict[str, StationScale],
+    budget_limit: float = BUDGET_LIMIT,
+    fairness_weight: float = 0.2,
+    safety_capacity_factor: float = 0.85,
+) -> Tuple[int, ...] | None:
+    community_names = [item.community for item in communities]
+    scale_tokens = [1, 2, 3]
+    scale_by_token = {1: scales["小型"], 2: scales["中型"], 3: scales["大型"]}
+    daily_demand = {
+        item.community: community_total_daily_demand(item)
+        for item in communities
+    }
+    total_demand = sum(daily_demand.values())
+    if total_demand <= MILP_TOLERANCE:
+        return tuple(1 for _ in community_names)
+
+    reachable_pairs: List[Tuple[str, str]] = []
+    for demand_community in community_names:
+        for station_community in community_names:
+            if distance_matrix[demand_community][station_community] <= RADIUS_LIMIT + MILP_TOLERANCE:
+                reachable_pairs.append((demand_community, station_community))
+
+    build_indices: Dict[Tuple[str, int], int] = {}
+    assignment_indices: Dict[Tuple[str, str], int] = {}
+    idx = 0
+    for station_community in community_names:
+        for token in scale_tokens:
+            build_indices[(station_community, token)] = idx
+            idx += 1
+    for pair in reachable_pairs:
+        assignment_indices[pair] = idx
+        idx += 1
+    eta_idx = idx
+    var_count = eta_idx + 1
+
+    c = np.zeros(var_count, dtype=float)
+    integrality = np.zeros(var_count, dtype=int)
+    lb = np.zeros(var_count, dtype=float)
+    ub = np.full(var_count, np.inf, dtype=float)
+
+    for (station_community, token), var_idx in build_indices.items():
+        del station_community
+        integrality[var_idx] = 1
+        ub[var_idx] = 1.0
+        c[var_idx] = 1e-4 * scale_by_token[token].build_cost_wan
+
+    fairness_weight = min(max(fairness_weight, 0.0), 1.0)
+    served_weight = 1.0 - fairness_weight
+    for demand_community, station_community in reachable_pairs:
+        demand_value = daily_demand[demand_community]
+        ub[assignment_indices[(demand_community, station_community)]] = demand_value
+        distance = distance_matrix[demand_community][station_community]
+        distance_bonus = max(0.0, 1.0 - distance / RADIUS_LIMIT)
+        unit_benefit = served_weight / total_demand + 0.05 * distance_bonus / total_demand
+        c[assignment_indices[(demand_community, station_community)]] = -unit_benefit
+    ub[eta_idx] = 1.0
+    c[eta_idx] = -fairness_weight
+
+    rows = []
+    lbs = []
+    ubs = []
+
+    budget_row = np.zeros(var_count, dtype=float)
+    for (station_community, token), var_idx in build_indices.items():
+        del station_community
+        budget_row[var_idx] = scale_by_token[token].build_cost_wan
+    rows.append(budget_row)
+    lbs.append(-np.inf)
+    ubs.append(budget_limit)
+
+    at_least_one_row = np.zeros(var_count, dtype=float)
+    for var_idx in build_indices.values():
+        at_least_one_row[var_idx] = 1.0
+    rows.append(at_least_one_row)
+    lbs.append(1.0)
+    ubs.append(np.inf)
+
+    for station_community in community_names:
+        row = np.zeros(var_count, dtype=float)
+        for token in scale_tokens:
+            row[build_indices[(station_community, token)]] = 1.0
+        rows.append(row)
+        lbs.append(-np.inf)
+        ubs.append(1.0)
+
+    for demand_community in community_names:
+        row = np.zeros(var_count, dtype=float)
+        for station_community in community_names:
+            pair = (demand_community, station_community)
+            if pair in assignment_indices:
+                row[assignment_indices[pair]] = 1.0
+        rows.append(row)
+        lbs.append(-np.inf)
+        ubs.append(daily_demand[demand_community])
+
+        fairness_row = np.zeros(var_count, dtype=float)
+        for station_community in community_names:
+            pair = (demand_community, station_community)
+            if pair in assignment_indices:
+                fairness_row[assignment_indices[pair]] = 1.0
+        fairness_row[eta_idx] = -daily_demand[demand_community]
+        rows.append(fairness_row)
+        lbs.append(0.0)
+        ubs.append(np.inf)
+
+    for station_community in community_names:
+        cap_row = np.zeros(var_count, dtype=float)
+        for demand_community in community_names:
+            pair = (demand_community, station_community)
+            if pair in assignment_indices:
+                cap_row[assignment_indices[pair]] = 1.0
+        for token in scale_tokens:
+            cap_row[build_indices[(station_community, token)]] = (
+                -safety_capacity_factor * scale_by_token[token].daily_capacity
+            )
+        rows.append(cap_row)
+        lbs.append(-np.inf)
+        ubs.append(0.0)
+
+    for demand_community, station_community in reachable_pairs:
+        row = np.zeros(var_count, dtype=float)
+        row[assignment_indices[(demand_community, station_community)]] = 1.0
+        for token in scale_tokens:
+            row[build_indices[(station_community, token)]] = -daily_demand[demand_community]
+        rows.append(row)
+        lbs.append(-np.inf)
+        ubs.append(0.0)
+
+    constraints = [
+        LinearConstraint(np.vstack(rows), np.array(lbs, dtype=float), np.array(ubs, dtype=float))
+    ]
+    result = milp(
+        c=c,
+        integrality=integrality,
+        bounds=Bounds(lb, ub),
+        constraints=constraints,
+        options={"mip_rel_gap": 1e-8},
+    )
+    if not result.success or result.x is None:
+        return None
+
+    scheme_code: List[int] = []
+    for station_community in community_names:
+        chosen_token = 0
+        chosen_value = 0.0
+        for token in scale_tokens:
+            value = float(result.x[build_indices[(station_community, token)]])
+            if value > chosen_value + 0.5:
+                chosen_token = token
+                chosen_value = value
+        scheme_code.append(chosen_token)
+    return tuple(scheme_code)
+
+
 def enumerate_scheme_codes(n: int) -> Iterable[Tuple[int, ...]]:
     raise NotImplementedError("Use enumerate_feasible_scheme_codes instead")
 
@@ -594,7 +761,7 @@ def evaluate_scheme(
     annual_total_cost = sum(item.annual_total_cost for item in station_metrics)
     annual_net_profit = sum(item.annual_net_profit for item in station_metrics)
     profit_rate = annual_net_profit / annual_total_cost if annual_total_cost > 1e-12 else -1.0
-    profit_compliant = int(MIN_PROFIT_RATE - 1e-9 <= profit_rate <= MAX_PROFIT_RATE + 1e-9)
+    profit_compliant = scheme_profit_compliance(station_metrics)
     return SchemeEvaluation(
         scheme_code=scheme_code,
         stations=stations,

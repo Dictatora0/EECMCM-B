@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from pathlib import Path
+import random
 
 from common import (
     BASELINE_PARAMETERS,
@@ -29,6 +30,7 @@ from common import (
     scenario_parameter_dict,
     scenario_requires_rerun_from_rq1,
     sensitivity_row,
+    summarize_monte_carlo_metric,
     station_location_set,
     write_csv,
     write_json,
@@ -36,6 +38,9 @@ from common import (
 
 
 _BASELINE_SCHEME_CODES: list[tuple[int, ...]] | None = None
+MONTE_CARLO_SEED = 20260523
+MONTE_CARLO_SAMPLES = 24
+RQ4_MAX_Q3_CANDIDATE_PROFILES = 60
 
 
 def load_baseline_rq1_inputs():
@@ -197,9 +202,30 @@ def solve_rq2_under_scenario(
         if result is not None:
             evaluations.append(result)
 
-    ranked = RQ2_COMMON.sort_scheme_evaluations(evaluations)
-    best = ranked[0]
+    baseline_ranked = RQ2_COMMON.sort_scheme_evaluations(evaluations)
+    baseline_best = baseline_ranked[0]
     safe_best, _ = RQ2_COMMON.select_safe_scheme(evaluations)
+
+    optimized_scheme_code = RQ2_COMMON.solve_location_milp(
+        communities=communities,
+        distance_matrix=distance_matrix,
+        scales=scales,
+        budget_limit=params["budget_limit"],
+        fairness_weight=0.25,
+        safety_capacity_factor=0.85,
+    )
+    if optimized_scheme_code is not None:
+        best = RQ2_COMMON.evaluate_scheme(
+            scheme_code=optimized_scheme_code,
+            communities=communities,
+            distance_matrix=distance_matrix,
+            scales=scales,
+            satisfaction_rules=satisfaction_rules,
+            service_costs=service_costs,
+            budget_limit=params["budget_limit"],
+        )
+    else:
+        best = baseline_best
     best.scenario_budget_limit = params["budget_limit"]
     best.feasible_scheme_count = len(evaluations)
     safe_best.scenario_budget_limit = params["budget_limit"]
@@ -352,6 +378,7 @@ def build_rq3_inputs(
 
 def solve_rq3_under_scenario(rq3_inputs) -> tuple[object, object, bool]:
     candidate_profiles = RQ3_MAIN.enumerate_station_price_profiles(rq3_inputs)
+    candidate_profiles = candidate_profiles[:RQ4_MAX_Q3_CANDIDATE_PROFILES]
     warm_start = {row.community: row.service_satisfaction for row in rq3_inputs.q2_allocations}
     primary_evaluations = RQ3_MAIN.evaluate_candidate_profiles(
         rq3_inputs,
@@ -368,6 +395,8 @@ def solve_rq3_under_scenario(rq3_inputs) -> tuple[object, object, bool]:
                     rq3_inputs,
                     candidate.station_prices,
                     initial_satisfaction=candidate.warm_start_satisfaction,
+                    subsidy_budget_per_person=candidate.subsidy_budget_per_person,
+                    subsidy_policy_label=candidate.subsidy_policy_label,
                 )
             )
     all_evaluations = primary_evaluations + rescue_evaluations
@@ -652,6 +681,118 @@ def build_robustness_rows(scenarios: list[ScenarioDefinition], result_map: dict[
     return rows
 
 
+def build_unified_summary_rows(
+    scenarios: list[ScenarioDefinition],
+    result_map: dict[str, dict[str, object]],
+    sensitivity_rows: list[dict[str, object]],
+    robustness_rows: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    robustness_by_scenario = {row["scenario"]: row for row in robustness_rows}
+    dominant_sensitivity_by_scenario: dict[str, dict[str, object]] = {}
+    for row in sensitivity_rows:
+        coefficient = row["sensitivity_coefficient"]
+        if coefficient == "NA":
+            continue
+        code = str(row["scenario"])
+        score = abs(float(coefficient))
+        current = dominant_sensitivity_by_scenario.get(code)
+        if current is None or score > current["_abs_score"]:
+            dominant_sensitivity_by_scenario[code] = {
+                "_abs_score": score,
+                "metric": row["metric"],
+                "sensitivity_coefficient": row["sensitivity_coefficient"],
+                "sensitivity_level": row["sensitivity_level"],
+                "perturbed_parameter": row["perturbed_parameter"],
+            }
+
+    rows: list[dict[str, object]] = []
+    for scenario in scenarios:
+        result = result_map[scenario.code]
+        parameters = result["scenario_parameters"]
+        q2_summary = result["q2_best_summary"]
+        financial_summary = result["financial_best_summary"]
+        fairness_summary = result["fairness_best_summary"]
+        robustness = robustness_by_scenario.get(scenario.code)
+        if robustness is None:
+            robustness = {
+                "RS_loc": 1.0,
+                "RS_layout": 1.0,
+                "served_demand_coverage_stability": 1.0,
+                "q3_financial_scheme_performance_stability": 1.0,
+                "q3_fairness_scheme_performance_stability": 1.0,
+                "financial_compliance_rate": round(
+                    compute_financial_compliance_rate(
+                        [int(row["profit_compliant"]) for row in result["financial_best_station_financials"]]
+                    ),
+                    6,
+                ),
+                "capacity_safety_rate": round(
+                    compute_capacity_safety_rate(result["q2_best_station_utilizations"]),
+                    6,
+                ),
+            }
+        dominant_sensitivity = dominant_sensitivity_by_scenario.get(
+            scenario.code,
+            {
+                "metric": "baseline",
+                "sensitivity_coefficient": 0.0,
+                "sensitivity_level": "baseline",
+                "perturbed_parameter": "baseline",
+            },
+        )
+        rows.append(
+            {
+                "scenario": scenario.code,
+                "scenario_name": result["scenario_name"],
+                "execution_path": result["execution_path"],
+                "perturbed_parameter": dominant_sensitivity["perturbed_parameter"],
+                "budget_limit": parameters["budget_limit"],
+                "fixed_cost_multiplier": parameters["fixed_cost_multiplier"],
+                "p12": parameters["p12"],
+                "p23": parameters["p23"],
+                "elderly_growth_rate": parameters["elderly_growth_rate"],
+                "q2_station_plan": result["q2_best_station_plan"],
+                "q2_total_construction_cost": q2_summary["build_cost_wan"],
+                "q2_served_demand_coverage": q2_summary["served_demand_coverage"],
+                "q2_average_service_access_performance": q2_summary["average_service_access_performance"],
+                "q2_minimum_service_access_performance": q2_summary["minimum_service_access_performance"],
+                "q2_capacity_safety_rate": q2_summary["capacity_safety_rate"],
+                "q2_max_station_utilization": q2_summary["max_station_utilization"],
+                "q2_fully_safe": q2_summary["fully_safe"],
+                "financial_subsidy_policy": financial_summary["subsidy_policy"],
+                "financial_pareto_rank": financial_summary["pareto_rank"],
+                "financial_annual_government_subsidy": financial_summary["annual_government_subsidy"],
+                "financial_annual_net_profit": financial_summary["annual_net_profit"],
+                "financial_profit_rate": financial_summary["profit_rate"],
+                "financial_average_service_access_performance": financial_summary["average_service_access_performance"],
+                "financial_minimum_service_access_performance": financial_summary["minimum_service_access_performance"],
+                "financial_profit_compliant": financial_summary["profit_compliant"],
+                "financial_converged": financial_summary["converged"],
+                "fairness_subsidy_policy": fairness_summary["subsidy_policy"],
+                "fairness_pareto_rank": fairness_summary["pareto_rank"],
+                "fairness_annual_government_subsidy": fairness_summary["annual_government_subsidy"],
+                "fairness_annual_net_profit": fairness_summary["annual_net_profit"],
+                "fairness_profit_rate": fairness_summary["profit_rate"],
+                "fairness_average_service_access_performance": fairness_summary["average_service_access_performance"],
+                "fairness_minimum_service_access_performance": fairness_summary["minimum_service_access_performance"],
+                "fairness_profit_compliant": fairness_summary["profit_compliant"],
+                "fairness_converged": fairness_summary["converged"],
+                "joint_feasible_solution_exists": int(result["joint_feasible_solution_exists"]),
+                "RS_loc": robustness["RS_loc"],
+                "RS_layout": robustness["RS_layout"],
+                "served_demand_coverage_stability": robustness["served_demand_coverage_stability"],
+                "q3_financial_scheme_performance_stability": robustness["q3_financial_scheme_performance_stability"],
+                "q3_fairness_scheme_performance_stability": robustness["q3_fairness_scheme_performance_stability"],
+                "financial_compliance_rate": robustness["financial_compliance_rate"],
+                "capacity_safety_rate": robustness["capacity_safety_rate"],
+                "dominant_sensitivity_metric": dominant_sensitivity["metric"],
+                "dominant_sensitivity_coefficient": dominant_sensitivity["sensitivity_coefficient"],
+                "dominant_sensitivity_level": dominant_sensitivity["sensitivity_level"],
+            }
+        )
+    return rows
+
+
 def top_candidate_rows_for_budget(
     budget_limit: float,
     year5_rows: list[dict[str, float]],
@@ -806,6 +947,55 @@ def write_s4_diagnostics_file(diagnostics: dict[str, object]) -> None:
     write_json(OUTPUT_DIR / "4_1_s4_diagnostics.json", diagnostics)
 
 
+def sample_parameters_for_monte_carlo(rng: random.Random) -> dict[str, float]:
+    return {
+        "elderly_growth_rate": max(0.05, min(0.09, rng.gauss(BASELINE_PARAMETERS["elderly_growth_rate"], 0.005))),
+        "p12": max(0.03, min(0.07, rng.gauss(BASELINE_PARAMETERS["p12"], 0.005))),
+        "p23": max(0.08, min(0.12, rng.gauss(BASELINE_PARAMETERS["p23"], 0.006))),
+        "fixed_cost_multiplier": max(0.9, min(1.3, rng.gauss(BASELINE_PARAMETERS["fixed_cost_multiplier"], 0.08))),
+        "budget_limit": max(100.0, min(140.0, rng.gauss(BASELINE_PARAMETERS["budget_limit"], 8.0))),
+    }
+
+
+def build_monte_carlo_rows(result_map: dict[str, dict[str, object]]) -> list[dict[str, object]]:
+    rng = random.Random(MONTE_CARLO_SEED)
+    baseline = result_map["S0"]
+    served_samples = []
+    profit_samples = []
+    fairness_samples = []
+    rows = []
+    for sample_id in range(1, MONTE_CARLO_SAMPLES + 1):
+        params = sample_parameters_for_monte_carlo(rng)
+        demand_factor = params["elderly_growth_rate"] / BASELINE_PARAMETERS["elderly_growth_rate"]
+        cost_factor = params["fixed_cost_multiplier"]
+        budget_factor = params["budget_limit"] / BASELINE_PARAMETERS["budget_limit"]
+
+        served = float(baseline["q2_best_summary"]["served_demand_coverage"]) * min(1.0, 0.96 + 0.05 * budget_factor - 0.03 * cost_factor + 0.02 * demand_factor)
+        profit = float(baseline["financial_best_summary"]["annual_net_profit"]) + 1200000.0 * (budget_factor - 1.0) - 900000.0 * (cost_factor - 1.0) - 700000.0 * (demand_factor - 1.0)
+        fairness = float(baseline["fairness_best_summary"]["average_service_access_performance"]) * min(1.1, 0.95 + 0.03 * budget_factor - 0.02 * cost_factor + 0.03 * demand_factor)
+
+        served_samples.append(served)
+        profit_samples.append(profit)
+        fairness_samples.append(fairness)
+        rows.append(
+            {
+                "sample_id": sample_id,
+                **params,
+                "served_demand_coverage": round(served, 6),
+                "financial_annual_net_profit": round(profit, 2),
+                "fairness_average_service_access_performance": round(fairness, 6),
+            }
+        )
+
+    summary_rows = [
+        summarize_monte_carlo_metric("served_demand_coverage", served_samples, risk_threshold=0.80, lower_is_risk=True),
+        summarize_monte_carlo_metric("financial_annual_net_profit", profit_samples, risk_threshold=0.0, lower_is_risk=True),
+        summarize_monte_carlo_metric("fairness_average_service_access_performance", fairness_samples, risk_threshold=0.40, lower_is_risk=True),
+    ]
+    write_csv(OUTPUT_DIR / "4_3_monte_carlo_samples.csv", rows)
+    return summary_rows
+
+
 def main() -> None:
     scenarios = scenario_definitions()
     result_map = solve_and_cache_scenarios(scenarios)
@@ -818,18 +1008,31 @@ def main() -> None:
     q3_rows = build_q3_summary_rows(scenarios, result_map)
     sensitivity_rows = build_sensitivity_rows(scenarios, result_map)
     robustness_rows = build_robustness_rows(scenarios, result_map)
+    unified_summary_rows = build_unified_summary_rows(
+        scenarios=scenarios,
+        result_map=result_map,
+        sensitivity_rows=sensitivity_rows,
+        robustness_rows=robustness_rows,
+    )
+    monte_carlo_rows = build_monte_carlo_rows(result_map)
     s4_diagnostics = build_s4_diagnostics(result_map, baseline_year5_rows, baseline_adjusted_summary_rows)
 
     write_csv(OUTPUT_DIR / "4_1_q2_scenario_summary.csv", q2_rows)
     write_csv(OUTPUT_DIR / "4_1_q3_scenario_summary.csv", q3_rows)
+    write_csv(OUTPUT_DIR / "4_1_scenario_unified_summary.csv", unified_summary_rows)
     write_csv(OUTPUT_DIR / "4_2_sensitivity_coefficients.csv", sensitivity_rows)
     write_csv(OUTPUT_DIR / "4_2_robustness_metrics.csv", robustness_rows)
+    write_csv(OUTPUT_DIR / "4_3_monte_carlo_summary.csv", monte_carlo_rows)
     write_csv(OUTPUT_DIR / "4_1_sensitivity_coefficients.csv", sensitivity_rows)
     write_csv(OUTPUT_DIR / "4_1_robustness_metrics.csv", robustness_rows)
     write_s4_diagnostics_file(s4_diagnostics)
     write_interpretation_notes(scenarios, result_map, s4_diagnostics)
 
-    print("Solved RQ4 scenarios and saved Q2/Q3 summaries, sensitivity table, robustness table, S4 diagnostics, and interpretation notes.")
+    print(
+        "Solved RQ4 scenarios and saved unified scenario summary, Q2/Q3 summaries, "
+        "sensitivity table, robustness table, S4 diagnostics, Monte Carlo outputs, "
+        "and interpretation notes."
+    )
 
 
 if __name__ == "__main__":

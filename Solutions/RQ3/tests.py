@@ -39,6 +39,9 @@ PriceEvaluation = RQ3_MAIN.PriceEvaluation
 IterationRecord = RQ3_MAIN.IterationRecord
 select_financial_best = RQ3_MAIN.select_financial_best
 select_fairness_best = RQ3_MAIN.select_fairness_best
+apply_targeted_subsidy_policy = RQ3_MAIN.apply_targeted_subsidy_policy
+compute_equity_metrics = RQ3_MAIN.compute_equity_metrics
+assign_pareto_ranks = RQ3_MAIN.assign_pareto_ranks
 
 
 def make_stub_inputs() -> RQ3Inputs:
@@ -466,6 +469,166 @@ def test_joint_feasible_solution_requires_profit_fairness_and_convergence() -> N
     assert not joint_feasible_solution_exists([bad], min_service_access_threshold=0.65)
 
 
+def test_targeted_subsidy_policy_reduces_net_payment_for_priority_group() -> None:
+    subsidy = apply_targeted_subsidy_policy(
+        community="A",
+        service="助餐",
+        posted_price=20.0,
+        low_income_communities={"A"},
+        vulnerable_weight=0.6,
+        low_income_weight=0.4,
+        service_priority={"助餐": 0.5},
+        subsidy_budget_per_person=6.0,
+        is_vulnerable=True,
+    )
+    assert 0.0 < subsidy <= 6.0
+
+
+def test_equity_metrics_capture_dispersion_and_extremes() -> None:
+    metrics = compute_equity_metrics(
+        community_rows=[
+            {"community": "A", "service_access_performance": 0.9},
+            {"community": "B", "service_access_performance": 0.6},
+            {"community": "C", "service_access_performance": 0.3},
+        ],
+        population_weights={"A": 100.0, "B": 100.0, "C": 100.0},
+    )
+    assert 0.0 <= metrics["gini_access"] <= 1.0
+    assert abs(metrics["max_min_gap"] - 0.6) < 1e-9
+
+
+def test_assign_pareto_ranks_uses_non_dominated_front_layers() -> None:
+    profile = {
+        "A": {"助餐": 10.0, "日间照料": 10.0, "上门护理": 10.0, "康复理疗": 10.0, "助浴": 10.0, "紧急救助": 0.0},
+    }
+
+    def make_item(avg_access: float, profit_rate: float, gini: float) -> PriceEvaluation:
+        return PriceEvaluation(
+            station_prices=profile,
+            iteration_count=1,
+            converged=1,
+            average_service_satisfaction=avg_access,
+            minimum_service_satisfaction=avg_access,
+            average_service_access_performance=avg_access,
+            minimum_service_access_performance=avg_access,
+            vulnerable_service_satisfaction=avg_access,
+            annual_government_subsidy=0.0,
+            annual_service_revenue=10000.0,
+            annual_direct_cost=9000.0,
+            annual_fixed_cost=1000.0,
+            annual_depreciation=0.0,
+            annual_total_cost=10000.0,
+            annual_net_profit_before_subsidy=profit_rate * 10000.0,
+            annual_net_profit_after_subsidy=profit_rate * 10000.0,
+            annual_net_profit=profit_rate * 10000.0,
+            profit_rate=profit_rate,
+            feasible_station_count=1,
+            profit_compliant=1,
+            fair_satisfaction_compliant=1,
+            low_income_service_satisfaction=avg_access,
+            low_income_served_coverage=1.0,
+            weighted_served_population_coverage=avg_access,
+            served_demand_coverage=avg_access,
+            damping_used=0,
+            iteration_trace=[IterationRecord(1, 0.0, avg_access, 1, 0.0, 0)],
+            station_financials=[{"station_community": "A", "profit_rate": profit_rate}],
+            community_results=[{"community": "A", "service_satisfaction": avg_access, "service_access_performance": avg_access}],
+            accessibility_groups=[],
+            gini_access=gini,
+            theil_access=gini,
+            max_min_gap=0.0,
+        )
+
+    frontier_a = make_item(avg_access=0.80, profit_rate=0.04, gini=0.30)
+    frontier_b = make_item(avg_access=0.78, profit_rate=0.05, gini=0.28)
+    second_front = make_item(avg_access=0.72, profit_rate=0.03, gini=0.35)
+    third_front = make_item(avg_access=0.68, profit_rate=0.02, gini=0.40)
+
+    assign_pareto_ranks([frontier_a, frontier_b, second_front, third_front])
+
+    assert frontier_a.pareto_rank == 1
+    assert frontier_b.pareto_rank == 1
+    assert second_front.pareto_rank == 2
+    assert third_front.pareto_rank == 3
+
+
+def test_fairness_selector_does_not_let_convergence_override_core_fairness() -> None:
+    profile = {
+        "A": {"助餐": 10.0, "日间照料": 10.0, "上门护理": 10.0, "康复理疗": 10.0, "助浴": 10.0, "紧急救助": 0.0},
+    }
+    converged_but_unfair = PriceEvaluation(
+        station_prices=profile,
+        iteration_count=3,
+        converged=1,
+        average_service_satisfaction=0.75,
+        minimum_service_satisfaction=0.65,
+        average_service_access_performance=0.60,
+        minimum_service_access_performance=0.10,
+        vulnerable_service_satisfaction=0.55,
+        annual_government_subsidy=1000.0,
+        annual_service_revenue=10000.0,
+        annual_direct_cost=9600.0,
+        annual_fixed_cost=1000.0,
+        annual_depreciation=500.0,
+        annual_total_cost=11100.0,
+        annual_net_profit_before_subsidy=-1100.0,
+        annual_net_profit_after_subsidy=-100.0,
+        annual_net_profit=-100.0,
+        profit_rate=-100.0 / 11100.0,
+        feasible_station_count=0,
+        profit_compliant=0,
+        fair_satisfaction_compliant=0,
+        low_income_service_satisfaction=0.45,
+        low_income_served_coverage=0.6,
+        weighted_served_population_coverage=0.5,
+        served_demand_coverage=0.55,
+        damping_used=0,
+        iteration_trace=[IterationRecord(1, 0.0, 0.75, 0, 1000.0, 0)],
+        station_financials=[{"station_community": "A", "profit_rate": -0.01}],
+        community_results=[{"community": "A", "service_satisfaction": 0.65, "service_access_performance": 0.10}],
+        accessibility_groups=[],
+        gini_access=0.50,
+        theil_access=0.20,
+        max_min_gap=0.80,
+    )
+    non_converged_but_fairer = PriceEvaluation(
+        station_prices=profile,
+        iteration_count=30,
+        converged=0,
+        average_service_satisfaction=0.85,
+        minimum_service_satisfaction=0.78,
+        average_service_access_performance=0.76,
+        minimum_service_access_performance=0.39,
+        vulnerable_service_satisfaction=0.84,
+        annual_government_subsidy=1000.0,
+        annual_service_revenue=10000.0,
+        annual_direct_cost=9800.0,
+        annual_fixed_cost=1000.0,
+        annual_depreciation=500.0,
+        annual_total_cost=11300.0,
+        annual_net_profit_before_subsidy=-1300.0,
+        annual_net_profit_after_subsidy=-300.0,
+        annual_net_profit=-300.0,
+        profit_rate=-300.0 / 11300.0,
+        feasible_station_count=0,
+        profit_compliant=0,
+        fair_satisfaction_compliant=0,
+        low_income_service_satisfaction=0.83,
+        low_income_served_coverage=0.95,
+        weighted_served_population_coverage=0.82,
+        served_demand_coverage=0.84,
+        damping_used=1,
+        iteration_trace=[IterationRecord(1, 0.2, 0.85, 0, 1000.0, 1)],
+        station_financials=[{"station_community": "A", "profit_rate": -0.03}],
+        community_results=[{"community": "A", "service_satisfaction": 0.78, "service_access_performance": 0.39}],
+        accessibility_groups=[],
+        gini_access=0.22,
+        theil_access=0.03,
+        max_min_gap=0.50,
+    )
+    assert select_fairness_best([converged_but_unfair, non_converged_but_fairer]) is non_converged_but_fairer
+
+
 def run_all_tests() -> None:
     tests = [
         test_enumerate_station_price_profiles_respects_emergency_zero,
@@ -483,6 +646,10 @@ def run_all_tests() -> None:
         test_solve_collaboration_lp_keeps_emergency_at_primary_or_unmet,
         test_evaluation_summary_row_reports_joint_feasibility_and_financial_gap,
         test_joint_feasible_solution_requires_profit_fairness_and_convergence,
+        test_targeted_subsidy_policy_reduces_net_payment_for_priority_group,
+        test_equity_metrics_capture_dispersion_and_extremes,
+        test_assign_pareto_ranks_uses_non_dominated_front_layers,
+        test_fairness_selector_does_not_let_convergence_override_core_fairness,
     ]
     for test in tests:
         test()
