@@ -61,13 +61,16 @@ RQ3 只允许读取 RQ1 高精度文件：
 - `annual_total_cost = annual_direct_cost + annual_fixed_cost + annual_depreciation`
 - `annual_net_profit = annual_revenue + annual_subsidy - annual_total_cost`
 - `profit_rate = annual_net_profit / annual_total_cost`
-- `profit_compliant = 1[0 <= profit_rate <= 0.08]`
+- 对站点级财务表，`profit_compliant = 1[0 <= profit_rate <= 0.08]`
+- 对方案汇总表，`profit_compliant = 1` 表示全部已建站点均满足上述利润率约束，而不是只看汇总 `profit_rate`
 
 直接成本始终由原始服务量驱动，不允许改回有效人次口径。
 
 ## 5. 定价模型
 
 当前代码实现的是站点级统一溢价候选，不是“站点-服务项目级独立定价”。
+
+在基准实现中，考虑价格政策的可解释性与管理可操作性，本文采用站点级统一溢价策略。即同一服务站内各收费服务按相同溢价系数调整，紧急救助保持公益免费。该处理可以减少价格组合维度，并便于比较不同站点的财务可持续性。站点-服务项目级独立定价可作为后续扩展方向。
 
 价格方案写为：
 
@@ -109,6 +112,7 @@ RQ3 只允许读取 RQ1 高精度文件：
 - `converged`
 - `iterations`
 - `max_satisfaction_delta`
+  代码中该字段承担 `max_abs_delta` 的兼容输出角色。
 - `damping_used`
 
 ## 8. 双方案输出
@@ -119,6 +123,8 @@ RQ3 至少输出两类方案：
   优先满足利润率合规，报告平均/最低服务绩效、利润、利润率、补贴、收敛状态。
 - `fairness_priority_scheme`
   优先提高最低或平均服务绩效，报告其利润率合规性、财政缺口、收敛状态。
+
+若 `fairness_priority_scheme` 未收敛或不满足利润率约束，只能作为公平取向参考方案解释，不能写成“唯一最优方案”。
 
 若不存在同时满足：
 
@@ -133,4 +139,3 @@ RQ3 至少输出两类方案：
 并在汇总中明确写出：
 
 “在当前预算、补贴上限和服务需求下，调价无法同时实现财务合规与公平可及，需要追加补贴、扩容或专项公益服务补贴。”
-
