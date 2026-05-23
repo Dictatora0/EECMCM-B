@@ -3070,6 +3070,7 @@ $$
 2. 站点布局默认读取问题2主方案 `2_1_best_scheme_summary.csv`、`2_1_best_scheme_stations.csv` 和 `2_1_best_scheme_allocations.csv`。其中 `2_1_safe_scheme_*` 只作为稳健性比较方案或附录方案，不作为问题3的默认优化入口。
 3. `2_1_best_scheme_allocations.csv` 中的 `service_satisfaction` 仅对 `actually_served=1` 的小区有效；若某小区在问题2中未形成实际服务，则其满意度初值按 0 处理，不再沿用地理可达满意度。
 4. 问题3沿用问题2已经统一的概念划分：地理可达仅表示 1000 米内存在站点；实际服务表示需求被容量承接；有效服务表示“实际服务人次 × 满意度”；收入与补贴由有效服务驱动，直接支出由实际承接的原始服务量驱动。
+5. 问题3正式输出采用“双方案口径”：`3_1_financial_best_price_scheme_*` 表示财务合规最优方案，`3_1_fairness_best_price_scheme_*` 表示公平约束下最优方案；为兼容既有调用链，`3_1_best_price_scheme_*` 与 `3_1_financial_best_price_scheme_*` 保持一致。
 
 ---
 
@@ -3810,15 +3811,22 @@ $$
 
 ### 问题3结果输出表设计
 
-后续集中求解时，问题3建议直接输出与代码文件一一对应的 6 张结果表。这样论文表格、作图数据和程序输出可以完全对齐，避免后期人工转写造成口径漂移。
+为增强论文表达的政策解释力，问题3不再只输出单一“最优方案”，而是采用“双方案输出 + 候选排序表”的结果组织方式：
 
-#### 表1：最优定价方案汇总表
+- 财务合规最优方案：优先满足全部站点 \(0\le \rho_j\le 0.08\)；
+- 公平约束下最优方案：优先满足已服务小区最低满意度约束；
+- 候选排序表：展示若干代表性方案在财务与公平之间的权衡。
 
-对应文件：`3_1_best_price_scheme_summary.csv`
+这样处理后，正文可以明确比较“财务可持续”与“公平优先”两类政策取向，避免把二者强行压缩成一个单解。
+
+#### 表1：双方案总览对照表
+
+对应文件：`3_1_dual_scheme_comparison.csv`
 
 | 字段 | 含义 |
 |---|---|
-| `price_scheme_detail` | 各站点最优价格方案摘要，当前用“站点:助餐价格/日间照料价格”展示统一价档 |
+| `scheme_label` | 方案标签，取 `financial_best` 或 `fairness_best` |
+| `price_scheme_detail` | 各站点价格方案摘要，当前用“站点:助餐价格/日间照料价格”展示统一价档 |
 | `iteration_count` | 固定点迭代收敛所需轮数 |
 | `converged` | 是否达到收敛条件 |
 | `profit_compliant` | 全部站点是否满足 \(0\le \rho_j\le 0.08\) |
@@ -3838,13 +3846,44 @@ $$
 | `annual_net_profit_after_subsidy` | 补贴后年度净利润总额 |
 | `annual_net_profit` | 当前与补贴后净利润一致，作为统一展示口径保留 |
 
-其中，低收入小区可统一定义为“人均月收入低于 10 个小区收入中位数”的小区集合，以保证定义客观稳定。
+该表建议直接放入正文，用于说明“财务优先”和“公平优先”之间的结构性差异。
 
 ---
 
-#### 表2：各服务站年度收支、利润率与公益服务成本缺口表
+#### 表2：财务合规最优方案汇总表
 
-对应文件：`3_1_best_price_scheme_stations.csv`
+对应文件：`3_1_financial_best_price_scheme_summary.csv`
+
+字段与表1一致。该方案优先保证全部站点利润率合规，适合作为“保本微利可实施方案”写入正文主结论。
+
+为兼容既有作图与调用链，代码同时保留一组别名文件：
+
+- `3_1_best_price_scheme_summary.csv`
+- `3_1_best_price_scheme_stations.csv`
+- `3_1_best_price_scheme_communities.csv`
+- `3_1_best_price_scheme_iteration_trace.csv`
+- `3_1_best_price_scheme_accessibility_groups.csv`
+
+它们与 `3_1_financial_best_price_scheme_*` 完全一致，可视为财务合规最优方案的兼容输出。
+
+其中，低收入小区统一定义为“人均月收入低于 10 个小区收入中位数”的小区集合，以保证定义客观稳定。
+
+---
+
+#### 表3：公平约束下最优方案汇总表
+
+对应文件：`3_1_fairness_best_price_scheme_summary.csv`
+
+字段与表1一致。该方案优先满足已服务小区最低满意度公平约束，更适合作为“公平优先方案”或“政策补贴加码前提下的参考方案”进行讨论。
+
+---
+
+#### 表4：各服务站年度收支、利润率与公益服务成本缺口表
+
+对应文件：
+
+- `3_1_financial_best_price_scheme_stations.csv`
+- `3_1_fairness_best_price_scheme_stations.csv`
 
 | 字段 | 含义 |
 |---|---|
@@ -3864,13 +3903,16 @@ $$
 | `profit_compliant` | 该站点是否满足 \(0\le \rho_j\le 0.08\) |
 | `emergency_public_loss` | 紧急救助免费服务形成的公益服务成本缺口 |
 
-该表对应论文中的“各服务站年度利润、利润率与公益服务成本缺口”主表，建议正文直接引用。
+正文若只保留一张主表，建议放财务合规最优方案；公平优先方案可作为对照表放附录或补充分析。
 
 ---
 
-#### 表3：各小区主站分配、协同分流与满意度表
+#### 表5：各小区主站分配、协同分流与满意度表
 
-对应文件：`3_1_best_price_scheme_communities.csv`
+对应文件：
+
+- `3_1_financial_best_price_scheme_communities.csv`
+- `3_1_fairness_best_price_scheme_communities.csv`
 
 | 字段 | 含义 |
 |---|---|
@@ -3890,9 +3932,12 @@ $$
 
 ---
 
-#### 表4：固定点迭代收敛过程表
+#### 表6：固定点迭代收敛过程表
 
-对应文件：`3_1_best_price_scheme_iteration_trace.csv`
+对应文件：
+
+- `3_1_financial_best_price_scheme_iteration_trace.csv`
+- `3_1_fairness_best_price_scheme_iteration_trace.csv`
 
 | 字段 | 含义 |
 |---|---|
@@ -3906,9 +3951,12 @@ $$
 
 ---
 
-#### 表5：不同类型与低收入群体服务可及性分析表
+#### 表7：不同类型与低收入群体服务可及性分析表
 
-对应文件：`3_1_best_price_scheme_accessibility_groups.csv`
+对应文件：
+
+- `3_1_financial_best_price_scheme_accessibility_groups.csv`
+- `3_1_fairness_best_price_scheme_accessibility_groups.csv`
 
 | 字段 | 含义 |
 |---|---|
@@ -3922,11 +3970,11 @@ $$
 
 ---
 
-#### 表6：候选价格方案排序表
+#### 表8：候选价格方案排序表
 
 对应文件：`3_1_top_price_schemes.csv`
 
-该表字段与表1一致，用于展示前若干候选价格方案在“利润率合规、脆弱群体满意度、总体满意度、补贴规模”之间的权衡关系。正文可仅展示前 3 至 5 个方案，完整排序表放入附录。
+该表字段与表1一致，用于展示前若干候选价格方案在“利润率合规、最低满意度公平、脆弱群体满意度、总体满意度、补贴规模”之间的权衡关系。正文可仅展示前 3 至 5 个方案，完整排序表放入附录。
 
 ---
 
