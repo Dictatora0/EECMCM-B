@@ -1,0 +1,5 @@
+﻿requested_capacity_safety_threshold,actual_threshold_used,scheme_code,scheme_detail,station_count,build_cost_wan,geographic_population_coverage,served_population_coverage,served_demand_coverage,average_service_satisfaction,minimum_service_satisfaction,total_raw_served_demand_daily,total_effective_person_times_daily,capacity_safety_rate,max_station_utilization,fully_safe,fully_served_community_count,total_unmet_daily_demand,utilization_variance,annual_net_profit_before_subsidy,annual_net_profit_after_policy_subsidy
+0.25,0.25,0010320001,C-小型;E-大型;F-中型;J-小型,4,113.0,1.0,1.0,0.808201,0.826841,0.716247,6674.486,5660.2453,0.25,1.0,0,7,1583.958,0.004967,-3045104.25,-709104.25
+0.5,0.5,0000020300,F-中型;H-大型,2,77.0,1.0,0.653846,0.566025,0.819049,0.6894,4674.486,3926.0745,0.5,1.0,0,5,3583.958,0.006622,-2140390.66,-534390.66
+0.75,0.5,0000020300,F-中型;H-大型,2,77.0,1.0,0.653846,0.566025,0.819049,0.6894,4674.486,3926.0745,0.5,1.0,0,5,3583.958,0.006622,-2140390.66,-534390.66
+1.0,0.5,0000020300,F-中型;H-大型,2,77.0,1.0,0.653846,0.566025,0.819049,0.6894,4674.486,3926.0745,0.5,1.0,0,5,3583.958,0.006622,-2140390.66,-534390.66

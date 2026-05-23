@@ -1,0 +1,24 @@
+{
+  "source": "RQ1",
+  "precision": "high",
+  "rounded_for_report": false,
+  "contains_years": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "generated_at": "2026-05-23T05:42:05.532860+00:00",
+  "intended_downstream": [
+    "RQ2",
+    "RQ3",
+    "RQ4"
+  ],
+  "files": {
+    "population_by_year": "1_1_high_precision_population_by_year.csv",
+    "year5_population": "1_1_high_precision_year5_population.csv",
+    "theoretical_demand": "1_2_high_precision_theoretical_demand.csv",
+    "adjusted_demand": "1_3_high_precision_adjusted_demand.csv"
+  }
+}
