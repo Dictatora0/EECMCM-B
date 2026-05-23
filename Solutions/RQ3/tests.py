@@ -28,6 +28,10 @@ price_profile_signature = RQ3_MAIN.price_profile_signature
 compute_price_satisfaction = RQ3_MAIN.compute_price_satisfaction
 meets_profit_rate_constraint = RQ3_MAIN.meets_profit_rate_constraint
 fixed_point_converged = RQ3_MAIN.fixed_point_converged
+detect_two_cycle_oscillation = RQ3_MAIN.detect_two_cycle_oscillation
+apply_damping = RQ3_MAIN.apply_damping
+evaluation_summary_row = RQ3_MAIN.evaluation_summary_row
+joint_feasible_solution_exists = RQ3_MAIN.joint_feasible_solution_exists
 select_primary_and_backup = RQ3_MAIN.select_primary_and_backup
 solve_collaboration_lp = RQ3_MAIN.solve_collaboration_lp
 CommunityChoice = RQ3_MAIN.CommunityChoice
@@ -255,6 +259,26 @@ def test_fixed_point_converged_uses_max_absolute_difference() -> None:
     assert not fixed_point_converged(old, new, epsilon=1e-6)
 
 
+def test_detect_two_cycle_oscillation_finds_simple_abab_pattern() -> None:
+    history = [
+        {"A": 0.8, "B": 0.6},
+        {"A": 0.7, "B": 0.5},
+        {"A": 0.8, "B": 0.6},
+        {"A": 0.7, "B": 0.5},
+    ]
+    assert detect_two_cycle_oscillation(history, tolerance=1e-9)
+
+
+def test_apply_damping_blends_candidate_with_previous_state() -> None:
+    damped = apply_damping(
+        previous={"A": 0.8, "B": 0.4},
+        candidate={"A": 0.6, "B": 0.8},
+        damping_lambda=0.5,
+    )
+    assert abs(damped["A"] - 0.7) < 1e-9
+    assert abs(damped["B"] - 0.6) < 1e-9
+
+
 def test_select_primary_and_backup_follows_utility_order() -> None:
     primary, backup = select_primary_and_backup({"E": 0.81, "J": 0.86, "F": 0.79})
     assert primary == "J"
@@ -320,8 +344,126 @@ def test_solve_collaboration_lp_keeps_emergency_at_primary_or_unmet() -> None:
     assert abs(row["primary_load_daily"] - 2.0) < 1e-9
     assert abs(row["overflow_load_daily"]) < 1e-9
     assert abs(row["unmet_load_daily"] - 2.0) < 1e-9
-    assert abs(row["service_satisfaction"] - 0.45) < 1e-9
+    assert abs(row["service_satisfaction"] - 0.9) < 1e-9
+    assert abs(row["demand_service_ratio"] - 0.5) < 1e-9
+    assert abs(row["service_access_performance"] - 0.45) < 1e-9
     assert abs(station_raw["B"]["紧急救助"]) < 1e-9
+
+
+def test_evaluation_summary_row_reports_joint_feasibility_and_financial_gap() -> None:
+    profile = {
+        "A": {"助餐": 10.0, "日间照料": 10.0, "上门护理": 10.0, "康复理疗": 10.0, "助浴": 10.0, "紧急救助": 0.0},
+    }
+    item = PriceEvaluation(
+        station_prices=profile,
+        iteration_count=4,
+        converged=0,
+        average_service_satisfaction=0.82,
+        minimum_service_satisfaction=0.72,
+        average_service_access_performance=0.58,
+        minimum_service_access_performance=0.41,
+        vulnerable_service_satisfaction=0.80,
+        annual_government_subsidy=800.0,
+        annual_service_revenue=9000.0,
+        annual_direct_cost=8800.0,
+        annual_fixed_cost=1000.0,
+        annual_depreciation=500.0,
+        annual_total_cost=10300.0,
+        annual_net_profit_before_subsidy=-1300.0,
+        annual_net_profit_after_subsidy=-500.0,
+        annual_net_profit=-500.0,
+        profit_rate=-500.0 / 10300.0,
+        feasible_station_count=0,
+        profit_compliant=0,
+        fair_satisfaction_compliant=1,
+        low_income_service_satisfaction=0.78,
+        low_income_served_coverage=0.9,
+        weighted_served_population_coverage=0.66,
+        served_demand_coverage=0.7,
+        damping_used=1,
+        iteration_trace=[IterationRecord(1, 0.01, 0.82, 0, 800.0, 1)],
+        station_financials=[{"station_community": "A", "profit_rate": -0.03}],
+        community_results=[{"community": "A", "service_satisfaction": 0.72, "service_access_performance": 0.41}],
+        accessibility_groups=[],
+    )
+    row = evaluation_summary_row(item)
+    assert row["minimum_service_satisfaction"] == 0.72
+    assert row["minimum_service_access_performance"] == 0.41
+    assert row["damping_used"] == 1
+    assert row["profit_compliant"] == 0
+    assert row["financial_gap_to_break_even"] == 500.0
+
+
+def test_joint_feasible_solution_requires_profit_fairness_and_convergence() -> None:
+    profile = {
+        "A": {"助餐": 10.0, "日间照料": 10.0, "上门护理": 10.0, "康复理疗": 10.0, "助浴": 10.0, "紧急救助": 0.0},
+    }
+    ok = PriceEvaluation(
+        station_prices=profile,
+        iteration_count=3,
+        converged=1,
+        average_service_satisfaction=0.82,
+        minimum_service_satisfaction=0.72,
+        average_service_access_performance=0.76,
+        minimum_service_access_performance=0.7,
+        vulnerable_service_satisfaction=0.80,
+        annual_government_subsidy=800.0,
+        annual_service_revenue=9000.0,
+        annual_direct_cost=8800.0,
+        annual_fixed_cost=1000.0,
+        annual_depreciation=500.0,
+        annual_total_cost=10300.0,
+        annual_net_profit_before_subsidy=-300.0,
+        annual_net_profit_after_subsidy=300.0,
+        annual_net_profit=300.0,
+        profit_rate=300.0 / 10300.0,
+        feasible_station_count=1,
+        profit_compliant=1,
+        fair_satisfaction_compliant=1,
+        low_income_service_satisfaction=0.78,
+        low_income_served_coverage=0.9,
+        weighted_served_population_coverage=0.66,
+        served_demand_coverage=0.7,
+        damping_used=0,
+        iteration_trace=[IterationRecord(1, 0.01, 0.82, 1, 800.0, 0)],
+        station_financials=[{"station_community": "A", "profit_rate": 0.03}],
+        community_results=[{"community": "A", "service_satisfaction": 0.72, "service_access_performance": 0.7}],
+        accessibility_groups=[],
+    )
+    bad = PriceEvaluation(
+        station_prices=profile,
+        iteration_count=30,
+        converged=0,
+        average_service_satisfaction=0.83,
+        minimum_service_satisfaction=0.8,
+        average_service_access_performance=0.79,
+        minimum_service_access_performance=0.75,
+        vulnerable_service_satisfaction=0.81,
+        annual_government_subsidy=1200.0,
+        annual_service_revenue=9200.0,
+        annual_direct_cost=9100.0,
+        annual_fixed_cost=1000.0,
+        annual_depreciation=500.0,
+        annual_total_cost=10600.0,
+        annual_net_profit_before_subsidy=-1400.0,
+        annual_net_profit_after_subsidy=-200.0,
+        annual_net_profit=-200.0,
+        profit_rate=-200.0 / 10600.0,
+        feasible_station_count=0,
+        profit_compliant=0,
+        fair_satisfaction_compliant=1,
+        low_income_service_satisfaction=0.8,
+        low_income_served_coverage=0.91,
+        weighted_served_population_coverage=0.7,
+        served_demand_coverage=0.71,
+        damping_used=1,
+        iteration_trace=[IterationRecord(1, 0.01, 0.83, 0, 1200.0, 1)],
+        station_financials=[{"station_community": "A", "profit_rate": -0.02}],
+        community_results=[{"community": "A", "service_satisfaction": 0.8, "service_access_performance": 0.75}],
+        accessibility_groups=[],
+    )
+    assert joint_feasible_solution_exists([ok, bad], min_service_access_threshold=0.65)
+    assert not joint_feasible_solution_exists([bad], min_service_access_threshold=0.65)
 
 
 def run_all_tests() -> None:
@@ -334,9 +476,13 @@ def run_all_tests() -> None:
         test_compute_price_satisfaction_penalizes_premium_price,
         test_profit_rate_constraint_is_bounded_between_zero_and_eight_percent,
         test_fixed_point_converged_uses_max_absolute_difference,
+        test_detect_two_cycle_oscillation_finds_simple_abab_pattern,
+        test_apply_damping_blends_candidate_with_previous_state,
         test_select_primary_and_backup_follows_utility_order,
         test_solve_collaboration_lp_sends_movable_overflow_to_backup,
         test_solve_collaboration_lp_keeps_emergency_at_primary_or_unmet,
+        test_evaluation_summary_row_reports_joint_feasibility_and_financial_gap,
+        test_joint_feasible_solution_requires_profit_fairness_and_convergence,
     ]
     for test in tests:
         test()

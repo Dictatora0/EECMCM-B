@@ -96,6 +96,19 @@ class SchemeSummaryRecord:
     utilization_variance: float
     annual_net_profit_before_subsidy: float
     annual_net_profit_after_policy_subsidy: float
+    weighted_served_population_coverage: float = 0.0
+    average_service_access_performance: float = 0.0
+    minimum_service_access_performance: float = 0.0
+    total_adjusted_demand_daily: float = 0.0
+    annual_revenue: float = 0.0
+    annual_subsidy: float = 0.0
+    annual_direct_cost: float = 0.0
+    annual_fixed_cost: float = 0.0
+    annual_depreciation: float = 0.0
+    annual_total_cost: float = 0.0
+    annual_net_profit: float = 0.0
+    profit_rate: float = 0.0
+    profit_compliant: int = 0
 
 
 @dataclass(frozen=True)
@@ -114,6 +127,12 @@ class StationRecord:
     annual_government_subsidy_baseline: float
     annual_net_profit_before_subsidy: float
     annual_net_profit_after_policy_subsidy: float
+    annual_revenue: float = 0.0
+    annual_subsidy: float = 0.0
+    annual_total_cost: float = 0.0
+    annual_net_profit: float = 0.0
+    profit_rate: float = 0.0
+    profit_compliant: int = 0
 
 
 @dataclass(frozen=True)
@@ -134,6 +153,9 @@ class AllocationRecord:
     response_satisfaction: float
     price_satisfaction: float
     service_satisfaction: float
+    adjusted_demand_daily: float = 0.0
+    demand_service_ratio: float = 0.0
+    service_access_performance: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -351,9 +373,13 @@ def load_q2_scheme_summary(
         "build_cost_wan",
         "geographic_population_coverage",
         "served_population_coverage",
+        "weighted_served_population_coverage",
         "served_demand_coverage",
         "average_service_satisfaction",
         "minimum_service_satisfaction",
+        "average_service_access_performance",
+        "minimum_service_access_performance",
+        "total_adjusted_demand_daily",
         "total_raw_served_demand_daily",
         "total_effective_person_times_daily",
         "capacity_safety_rate",
@@ -362,8 +388,17 @@ def load_q2_scheme_summary(
         "fully_served_community_count",
         "total_unmet_daily_demand",
         "utilization_variance",
+        "annual_revenue",
+        "annual_subsidy",
+        "annual_direct_cost",
+        "annual_fixed_cost",
+        "annual_depreciation",
+        "annual_total_cost",
         "annual_net_profit_before_subsidy",
         "annual_net_profit_after_policy_subsidy",
+        "annual_net_profit",
+        "profit_rate",
+        "profit_compliant",
     ]
     assert_required_columns(rows, required_columns, path)
     assert len(rows) == 1, f"{path.name} must contain exactly one summary row"
@@ -376,9 +411,13 @@ def load_q2_scheme_summary(
         build_cost_wan=float(row["build_cost_wan"]),
         geographic_population_coverage=float(row["geographic_population_coverage"]),
         served_population_coverage=float(row["served_population_coverage"]),
+        weighted_served_population_coverage=float(row["weighted_served_population_coverage"]),
         served_demand_coverage=float(row["served_demand_coverage"]),
         average_service_satisfaction=float(row["average_service_satisfaction"]),
         minimum_service_satisfaction=float(row["minimum_service_satisfaction"]),
+        average_service_access_performance=float(row["average_service_access_performance"]),
+        minimum_service_access_performance=float(row["minimum_service_access_performance"]),
+        total_adjusted_demand_daily=float(row["total_adjusted_demand_daily"]),
         total_raw_served_demand_daily=float(row["total_raw_served_demand_daily"]),
         total_effective_person_times_daily=float(row["total_effective_person_times_daily"]),
         capacity_safety_rate=float(row["capacity_safety_rate"]),
@@ -387,8 +426,17 @@ def load_q2_scheme_summary(
         fully_served_community_count=int(float(row["fully_served_community_count"])),
         total_unmet_daily_demand=float(row["total_unmet_daily_demand"]),
         utilization_variance=float(row["utilization_variance"]),
+        annual_revenue=float(row["annual_revenue"]),
+        annual_subsidy=float(row["annual_subsidy"]),
+        annual_direct_cost=float(row["annual_direct_cost"]),
+        annual_fixed_cost=float(row["annual_fixed_cost"]),
+        annual_depreciation=float(row["annual_depreciation"]),
+        annual_total_cost=float(row["annual_total_cost"]),
         annual_net_profit_before_subsidy=float(row["annual_net_profit_before_subsidy"]),
         annual_net_profit_after_policy_subsidy=float(row["annual_net_profit_after_policy_subsidy"]),
+        annual_net_profit=float(row["annual_net_profit"]),
+        profit_rate=float(row["profit_rate"]),
+        profit_compliant=int(float(row["profit_compliant"])),
     )
 
 
@@ -407,12 +455,18 @@ def load_q2_stations(
         "total_load",
         "utilization",
         "annual_service_revenue",
+        "annual_revenue",
+        "annual_subsidy",
         "annual_direct_cost",
         "annual_fixed_cost",
         "annual_depreciation",
         "annual_government_subsidy_baseline",
+        "annual_total_cost",
         "annual_net_profit_before_subsidy",
         "annual_net_profit_after_policy_subsidy",
+        "annual_net_profit",
+        "profit_rate",
+        "profit_compliant",
     ]
     assert_required_columns(rows, required_columns, path)
     records = [
@@ -425,12 +479,18 @@ def load_q2_stations(
             total_load=float(row["total_load"]),
             utilization=float(row["utilization"]),
             annual_service_revenue=float(row["annual_service_revenue"]),
+            annual_revenue=float(row["annual_revenue"]),
+            annual_subsidy=float(row["annual_subsidy"]),
             annual_direct_cost=float(row["annual_direct_cost"]),
             annual_fixed_cost=float(row["annual_fixed_cost"]),
             annual_depreciation=float(row["annual_depreciation"]),
             annual_government_subsidy_baseline=float(row["annual_government_subsidy_baseline"]),
+            annual_total_cost=float(row["annual_total_cost"]),
             annual_net_profit_before_subsidy=float(row["annual_net_profit_before_subsidy"]),
             annual_net_profit_after_policy_subsidy=float(row["annual_net_profit_after_policy_subsidy"]),
+            annual_net_profit=float(row["annual_net_profit"]),
+            profit_rate=float(row["profit_rate"]),
+            profit_compliant=int(float(row["profit_compliant"])),
         )
         for row in rows
     ]
@@ -452,8 +512,11 @@ def load_q2_allocations(
         "actually_served",
         "geographic_population_covered",
         "served_population_covered",
+        "adjusted_demand_daily",
         "raw_served_demand_daily",
         "effective_person_times_daily",
+        "demand_service_ratio",
+        "service_access_performance",
         "primary_load_daily",
         "overflow_load_daily",
         "unmet_load_daily",
@@ -474,8 +537,11 @@ def load_q2_allocations(
             actually_served=int(float(row["actually_served"])),
             geographic_population_covered=float(row["geographic_population_covered"]),
             served_population_covered=float(row["served_population_covered"]),
+            adjusted_demand_daily=float(row["adjusted_demand_daily"]),
             raw_served_demand_daily=float(row["raw_served_demand_daily"]),
             effective_person_times_daily=float(row["effective_person_times_daily"]),
+            demand_service_ratio=float(row["demand_service_ratio"]),
+            service_access_performance=float(row["service_access_performance"]),
             primary_load_daily=float(row["primary_load_daily"]),
             overflow_load_daily=float(row["overflow_load_daily"]),
             unmet_load_daily=float(row["unmet_load_daily"]),
@@ -699,6 +765,16 @@ def validate_allocation_records(records: List[AllocationRecord]) -> None:
             )
             assert abs(record.effective_person_times_daily) <= 1e-6, (
                 f"Unserved community {record.community} must have effective_person_times_daily = 0"
+            )
+            assert abs(record.service_access_performance) <= 1e-6, (
+                f"Unserved community {record.community} must have service_access_performance = 0"
+            )
+        else:
+            assert 0.6 - 1e-9 <= record.service_satisfaction <= 1.0 + 1e-9, (
+                f"Served community {record.community} must have service_satisfaction in [0.6, 1.0]"
+            )
+            assert 0.0 - 1e-9 <= record.service_access_performance <= 1.0 + 1e-9, (
+                f"Service access performance must be in [0, 1] for {record.community}"
             )
         if record.primary_station is None:
             assert record.actually_served == 0 or record.raw_served_demand_daily <= EPS, (

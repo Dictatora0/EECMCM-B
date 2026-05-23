@@ -34,6 +34,8 @@ MAX_FIXED_POINT_ITERATIONS = 30
 SUBSIDY_PER_EFFECTIVE_PERSON_TIME = 2.0
 MAX_PROFIT_RATE = 0.08
 MIN_PROFIT_RATE = 0.0
+DEFAULT_DAMPING_LAMBDA = 0.5
+DEFAULT_MIN_SERVICE_ACCESS_THRESHOLD = 0.6
 SATISFACTION_WEIGHTS = {"distance": 0.2, "response": 0.3, "price": 0.5}
 OVERFLOW_UTILITY_PENALTY = 0.08
 EARLY_STOP_NEGATIVE_PROFIT_MARGIN = -0.05
@@ -50,6 +52,7 @@ class IterationRecord:
     average_service_satisfaction: float
     feasible_station_count: int
     total_subsidy: float
+    damping_used: int = 0
 
 
 @dataclass(frozen=True)
@@ -77,6 +80,13 @@ class PriceEvaluation:
     station_financials: List[Dict[str, float]]
     community_results: List[Dict[str, float]]
     accessibility_groups: List[Dict[str, object]]
+    average_service_access_performance: float = 0.0
+    minimum_service_access_performance: float = 0.0
+    annual_total_cost: float = 0.0
+    profit_rate: float = 0.0
+    weighted_served_population_coverage: float = 0.0
+    served_demand_coverage: float = 0.0
+    damping_used: int = 0
 
 
 @dataclass(frozen=True)
@@ -362,11 +372,67 @@ def fixed_point_converged(
     return max_delta < epsilon
 
 
+def detect_two_cycle_oscillation(
+    history: List[Dict[str, float]],
+    tolerance: float = 1e-8,
+) -> bool:
+    if len(history) < 4:
+        return False
+    a_prev, b_prev, a_curr, b_curr = history[-4:]
+    communities = sorted(a_prev)
+    return (
+        all(abs(a_prev[c] - a_curr[c]) <= tolerance for c in communities)
+        and all(abs(b_prev[c] - b_curr[c]) <= tolerance for c in communities)
+    )
+
+
+def apply_damping(
+    previous: Dict[str, float],
+    candidate: Dict[str, float],
+    damping_lambda: float = DEFAULT_DAMPING_LAMBDA,
+) -> Dict[str, float]:
+    return {
+        community: damping_lambda * candidate[community] + (1.0 - damping_lambda) * previous[community]
+        for community in previous
+    }
+
+
 def meets_profit_rate_constraint(net_profit: float, total_cost: float) -> bool:
     if total_cost <= 0:
         return False
     profit_rate = net_profit / total_cost
     return MIN_PROFIT_RATE - 1e-9 <= profit_rate <= MAX_PROFIT_RATE + 1e-9
+
+
+def service_satisfaction_from_effective_ratio(effective_ratio: float) -> float:
+    if effective_ratio <= 1e-12:
+        return 0.0
+    return min(1.0, max(0.6, effective_ratio))
+
+
+def service_access_performance(
+    effective_person_times_daily: float,
+    adjusted_demand_daily: float,
+) -> float:
+    if adjusted_demand_daily <= 1e-12 or effective_person_times_daily <= 1e-12:
+        return 0.0
+    return min(1.0, effective_person_times_daily / adjusted_demand_daily)
+
+
+def financial_gap_to_break_even(item: PriceEvaluation) -> float:
+    return max(0.0, -item.annual_net_profit)
+
+
+def joint_feasible_solution_exists(
+    evaluations: List[PriceEvaluation],
+    min_service_access_threshold: float = DEFAULT_MIN_SERVICE_ACCESS_THRESHOLD,
+) -> bool:
+    return any(
+        item.profit_compliant == 1
+        and item.minimum_service_access_performance >= min_service_access_threshold - 1e-9
+        and item.converged == 1
+        for item in evaluations
+    )
 
 
 def select_primary_and_backup(utility_by_station: Dict[str, float]) -> tuple[str | None, str | None]:
@@ -516,7 +582,14 @@ def solve_collaboration_lp(
         primary_effective = primary_load * choice.utility_primary
         backup_effective = overflow_load * max(choice.utility_backup - OVERFLOW_UTILITY_PENALTY, 0.0)
         effective_total = primary_effective + backup_effective
-        service_satisfaction = effective_total / total_demand if total_demand > 0 else 0.0
+        served_ratio = (primary_load + overflow_load) / total_demand if total_demand > 1e-12 else 0.0
+        effective_ratio = effective_total / total_demand if total_demand > 1e-12 else 0.0
+        service_satisfaction = (
+            service_satisfaction_from_effective_ratio(effective_total / max(primary_load + overflow_load, 1e-12))
+            if primary_load + overflow_load > 1e-12
+            else 0.0
+        )
+        access_performance = service_access_performance(effective_total, total_demand)
 
         for service, amount in per_choice_service.get((choice_idx, "primary"), {}).items():
             station_raw[choice.primary_station][service] += amount
@@ -536,7 +609,10 @@ def solve_collaboration_lp(
                 "unmet_load_daily": unmet,
                 "raw_served_demand_daily": primary_load + overflow_load,
                 "effective_person_times_daily": effective_total,
+                "adjusted_demand_daily": total_demand,
+                "demand_service_ratio": min(1.0, served_ratio),
                 "service_satisfaction": service_satisfaction,
+                "service_access_performance": access_performance,
                 "served": int(primary_load + overflow_load > 1e-9),
                 "price_satisfaction": choice.price_satisfaction_primary,
             }
@@ -610,6 +686,7 @@ def evaluate_price_profile(
     max_iterations: int = MAX_FIXED_POINT_ITERATIONS,
     epsilon: float = FIXED_POINT_EPSILON,
     initial_satisfaction: Dict[str, float] | None = None,
+    damping_lambda: float = DEFAULT_DAMPING_LAMBDA,
 ) -> PriceEvaluation:
     populations = population_by_community(inputs.year5_population)
     stations = stations_by_community(inputs.q2_stations)
@@ -619,11 +696,13 @@ def evaluate_price_profile(
     baseline_adjusted_summary = adjusted_demand_summary_map(inputs.adjusted_demand_summary)
 
     old_satisfaction = initial_satisfaction or initial_service_satisfaction_by_community(inputs.q2_allocations)
+    satisfaction_history: List[Dict[str, float]] = [old_satisfaction.copy()]
     iteration_trace: List[IterationRecord] = []
     station_financials: List[Dict[str, float]] = []
     community_results: List[Dict[str, float]] = []
     final_station_net_profits: Dict[str, float] = {}
     final_station_total_costs: Dict[str, float] = {}
+    damping_used = 0
 
     for iteration in range(1, max_iterations + 1):
         response_by_station = {}
@@ -650,10 +729,19 @@ def evaluate_price_profile(
         )
 
         community_results_map = {row["community"]: row for row in community_results}
-        new_satisfaction = {
+        candidate_satisfaction = {
             community: community_results_map.get(community, {}).get("service_satisfaction", 0.0)
             for community in old_satisfaction
         }
+        if detect_two_cycle_oscillation(satisfaction_history + [candidate_satisfaction]):
+            new_satisfaction = apply_damping(
+                previous=old_satisfaction,
+                candidate=candidate_satisfaction,
+                damping_lambda=damping_lambda,
+            )
+            damping_used = 1
+        else:
+            new_satisfaction = candidate_satisfaction
 
         community_choice_map = {choice.community: choice for choice in choices}
         for row in community_results:
@@ -678,7 +766,10 @@ def evaluate_price_profile(
                         "unmet_load_daily": unmet_daily if unmet_daily else 0.0,
                         "raw_served_demand_daily": 0.0,
                         "effective_person_times_daily": 0.0,
+                        "adjusted_demand_daily": unmet_daily if unmet_daily else 0.0,
+                        "demand_service_ratio": 0.0,
                         "service_satisfaction": 0.0,
+                        "service_access_performance": 0.0,
                         "served": 0,
                         "price_satisfaction": 0.0,
                     }
@@ -693,6 +784,7 @@ def evaluate_price_profile(
         total_direct_cost = 0.0
         total_fixed_cost = 0.0
         total_depreciation = 0.0
+        total_total_cost = 0.0
         total_net_profit_before_subsidy = 0.0
         total_net_profit = 0.0
         final_station_net_profits = {}
@@ -730,6 +822,7 @@ def evaluate_price_profile(
             total_direct_cost += annual_direct_cost
             total_fixed_cost += annual_fixed_cost
             total_depreciation += annual_depreciation
+            total_total_cost += annual_total_cost
             total_net_profit_before_subsidy += annual_net_profit_before_subsidy
             total_net_profit += annual_net_profit
             emergency_public_loss = station_raw_demand[station_name]["紧急救助"] * direct_costs["紧急救助"] * 365.0
@@ -745,6 +838,8 @@ def evaluate_price_profile(
                     "annual_fixed_cost": annual_fixed_cost,
                     "annual_depreciation": annual_depreciation,
                     "annual_government_subsidy": annual_subsidy,
+                    "annual_subsidy": annual_subsidy,
+                    "annual_total_cost": annual_total_cost,
                     "annual_net_profit_before_subsidy": annual_net_profit_before_subsidy,
                     "annual_net_profit_after_subsidy": annual_net_profit,
                     "annual_net_profit": annual_net_profit,
@@ -759,9 +854,11 @@ def evaluate_price_profile(
             for community in old_satisfaction
         )
         served_satisfaction_values = [row["service_satisfaction"] for row in community_results if row["served"] == 1]
+        total_effective_current = sum(row["effective_person_times_daily"] for row in community_results)
+        total_raw_current = sum(row["raw_served_demand_daily"] for row in community_results)
         average_service_satisfaction = (
-            sum(served_satisfaction_values) / len(served_satisfaction_values)
-            if served_satisfaction_values
+            total_effective_current / total_raw_current
+            if total_raw_current > 1e-12
             else 0.0
         )
         iteration_trace.append(
@@ -771,6 +868,7 @@ def evaluate_price_profile(
                 average_service_satisfaction=average_service_satisfaction,
                 feasible_station_count=feasible_station_count,
                 total_subsidy=total_subsidy,
+                damping_used=damping_used,
             )
         )
         if iteration >= 3:
@@ -784,17 +882,31 @@ def evaluate_price_profile(
                 break
         if fixed_point_converged(old_satisfaction, new_satisfaction, epsilon=epsilon):
             old_satisfaction = new_satisfaction
+            satisfaction_history.append(new_satisfaction.copy())
             break
         old_satisfaction = new_satisfaction
+        satisfaction_history.append(new_satisfaction.copy())
 
     served_communities = [row for row in community_results if row["served"] == 1]
     served_satisfaction_values = [row["service_satisfaction"] for row in served_communities]
+    total_effective_person_times = sum(row["effective_person_times_daily"] for row in community_results)
+    total_raw_served_demand_daily = sum(row["raw_served_demand_daily"] for row in community_results)
+    total_adjusted_demand_daily = sum(row["adjusted_demand_daily"] for row in community_results)
     average_service_satisfaction = (
-        sum(served_satisfaction_values) / len(served_satisfaction_values)
-        if served_satisfaction_values
+        total_effective_person_times / total_raw_served_demand_daily
+        if total_raw_served_demand_daily > 1e-12
         else 0.0
     )
     minimum_service_satisfaction = min(served_satisfaction_values) if served_satisfaction_values else 0.0
+    average_service_access_performance = (
+        total_effective_person_times / total_adjusted_demand_daily
+        if total_adjusted_demand_daily > 1e-12
+        else 0.0
+    )
+    minimum_service_access_performance = min(
+        (row["service_access_performance"] for row in community_results),
+        default=0.0,
+    )
     vulnerable_population = sum(
         populations[row["community"]].semi_disabled + populations[row["community"]].disabled
         for row in community_results
@@ -830,8 +942,23 @@ def evaluate_price_profile(
         if low_income_population > 0
         else 0.0
     )
+    total_population = sum(populations[row["community"]].elderly_total for row in community_results)
+    weighted_served_population_coverage = (
+        sum(
+            populations[row["community"]].elderly_total * row["demand_service_ratio"]
+            for row in community_results
+        )
+        / total_population
+        if total_population > 0
+        else 0.0
+    )
+    served_demand_coverage = (
+        total_raw_served_demand_daily / total_adjusted_demand_daily
+        if total_adjusted_demand_daily > 1e-12
+        else 0.0
+    )
     fair_satisfaction_compliant = int(
-        all(row["service_satisfaction"] >= 0.6 - 1e-9 for row in served_communities)
+        minimum_service_access_performance >= DEFAULT_MIN_SERVICE_ACCESS_THRESHOLD - 1e-9
     )
     profit_compliant = int(
         all(
@@ -891,20 +1018,27 @@ def evaluate_price_profile(
         converged=int(iteration_trace[-1].max_satisfaction_delta < epsilon) if iteration_trace else 0,
         average_service_satisfaction=average_service_satisfaction,
         minimum_service_satisfaction=minimum_service_satisfaction,
+        average_service_access_performance=average_service_access_performance,
+        minimum_service_access_performance=minimum_service_access_performance,
         vulnerable_service_satisfaction=vulnerable_service_satisfaction,
         annual_government_subsidy=sum(row["annual_government_subsidy"] for row in station_financials),
         annual_service_revenue=sum(row["annual_service_revenue"] for row in station_financials),
         annual_direct_cost=sum(row["annual_direct_cost"] for row in station_financials),
         annual_fixed_cost=sum(row["annual_fixed_cost"] for row in station_financials),
         annual_depreciation=sum(row["annual_depreciation"] for row in station_financials),
+        annual_total_cost=total_total_cost,
         annual_net_profit_before_subsidy=total_net_profit_before_subsidy,
         annual_net_profit_after_subsidy=total_net_profit,
         annual_net_profit=sum(row["annual_net_profit"] for row in station_financials),
+        profit_rate=total_net_profit / total_total_cost if total_total_cost > 1e-12 else -1.0,
         feasible_station_count=sum(row["profit_compliant"] for row in station_financials),
         profit_compliant=profit_compliant,
         fair_satisfaction_compliant=fair_satisfaction_compliant,
         low_income_service_satisfaction=low_income_service_satisfaction,
         low_income_served_coverage=low_income_served_coverage,
+        weighted_served_population_coverage=weighted_served_population_coverage,
+        served_demand_coverage=served_demand_coverage,
+        damping_used=damping_used,
         iteration_trace=iteration_trace,
         station_financials=station_financials,
         community_results=community_results,
@@ -971,29 +1105,44 @@ def select_fairness_best(evaluations: List[PriceEvaluation]) -> PriceEvaluation:
 def evaluation_summary_row(item: PriceEvaluation) -> Dict[str, object]:
     station_labels = []
     for station_name in sorted(item.station_prices):
-        meal_price = item.station_prices[station_name]["助餐"]
-        daycare_price = item.station_prices[station_name]["日间照料"]
-        station_labels.append(f"{station_name}:助餐{meal_price:.1f}/日照{daycare_price:.1f}")
+        multipliers = [
+            item.station_prices[station_name][service] / base_price_by_service()[service]
+            for service in NON_EMERGENCY_SERVICES
+            if base_price_by_service()[service] > 0
+        ]
+        alpha = multipliers[0] if multipliers else 1.0
+        station_labels.append(f"{station_name}:alpha={alpha:.1f}")
     return {
         "price_scheme_detail": ";".join(station_labels),
+        "pricing_model": "station_level_uniform_premium",
+        "pricing_formula": "p_{j,r}=alpha_j*p_r^0,r=1,...,5; p_{j,6}=0",
         "iteration_count": item.iteration_count,
+        "iterations": item.iteration_count,
         "converged": item.converged,
+        "damping_used": item.damping_used,
         "profit_compliant": item.profit_compliant,
         "fair_satisfaction_compliant": item.fair_satisfaction_compliant,
         "feasible_station_count": item.feasible_station_count,
         "average_service_satisfaction": round(item.average_service_satisfaction, 6),
         "minimum_service_satisfaction": round(item.minimum_service_satisfaction, 6),
+        "average_service_access_performance": round(item.average_service_access_performance, 6),
+        "minimum_service_access_performance": round(item.minimum_service_access_performance, 6),
         "vulnerable_service_satisfaction": round(item.vulnerable_service_satisfaction, 6),
         "low_income_service_satisfaction": round(item.low_income_service_satisfaction, 6),
         "low_income_served_coverage": round(item.low_income_served_coverage, 6),
+        "weighted_served_population_coverage": round(item.weighted_served_population_coverage, 6),
+        "served_demand_coverage": round(item.served_demand_coverage, 6),
         "annual_government_subsidy": round(item.annual_government_subsidy, 2),
         "annual_service_revenue": round(item.annual_service_revenue, 2),
         "annual_direct_cost": round(item.annual_direct_cost, 2),
         "annual_fixed_cost": round(item.annual_fixed_cost, 2),
         "annual_depreciation": round(item.annual_depreciation, 2),
+        "annual_total_cost": round(item.annual_total_cost, 2),
         "annual_net_profit_before_subsidy": round(item.annual_net_profit_before_subsidy, 2),
         "annual_net_profit_after_subsidy": round(item.annual_net_profit_after_subsidy, 2),
         "annual_net_profit": round(item.annual_net_profit, 2),
+        "profit_rate": round(item.profit_rate, 6),
+        "financial_gap_to_break_even": round(financial_gap_to_break_even(item), 2),
     }
 
 
@@ -1009,10 +1158,13 @@ def write_price_evaluation_bundle(prefix: str, item: PriceEvaluation) -> None:
                 "annual_fixed_cost": round(row["annual_fixed_cost"], 2),
                 "annual_depreciation": round(row["annual_depreciation"], 2),
                 "annual_government_subsidy": round(row["annual_government_subsidy"], 2),
+                "annual_subsidy": round(row["annual_subsidy"], 2),
+                "annual_total_cost": round(row["annual_total_cost"], 2),
                 "annual_net_profit_before_subsidy": round(row["annual_net_profit_before_subsidy"], 2),
                 "annual_net_profit_after_subsidy": round(row["annual_net_profit_after_subsidy"], 2),
                 "annual_net_profit": round(row["annual_net_profit"], 2),
                 "profit_rate": round(row["profit_rate"], 6),
+                "profit_compliant": row["profit_compliant"],
                 "emergency_public_loss": round(row["emergency_public_loss"], 2),
             }
             for row in item.station_financials
@@ -1024,9 +1176,12 @@ def write_price_evaluation_bundle(prefix: str, item: PriceEvaluation) -> None:
             {
                 **row,
                 "service_satisfaction": round(row["service_satisfaction"], 6),
+                "service_access_performance": round(row["service_access_performance"], 6),
                 "price_satisfaction": round(row["price_satisfaction"], 6),
+                "adjusted_demand_daily": round(row["adjusted_demand_daily"], 4),
                 "raw_served_demand_daily": round(row["raw_served_demand_daily"], 4),
                 "effective_person_times_daily": round(row["effective_person_times_daily"], 4),
+                "demand_service_ratio": round(row["demand_service_ratio"], 6),
             }
             for row in item.community_results
         ],
@@ -1040,6 +1195,7 @@ def write_price_evaluation_bundle(prefix: str, item: PriceEvaluation) -> None:
                 "average_service_satisfaction": round(row.average_service_satisfaction, 6),
                 "feasible_station_count": row.feasible_station_count,
                 "total_subsidy": round(row.total_subsidy, 2),
+                "damping_used": row.damping_used,
             }
             for row in item.iteration_trace
         ],
@@ -1106,6 +1262,7 @@ def main(max_candidate_profiles: int | None = None) -> None:
     ranked = sort_price_evaluations(all_evaluations)
     financial_best = select_financial_best(all_evaluations)
     fairness_best = select_fairness_best(all_evaluations)
+    joint_feasible = joint_feasible_solution_exists(all_evaluations)
 
     write_price_evaluation_bundle("3_1_best_price_scheme", financial_best)
     write_price_evaluation_bundle("3_1_financial_best_price_scheme", financial_best)
@@ -1117,8 +1274,39 @@ def main(max_candidate_profiles: int | None = None) -> None:
     write_csv(
         OUTPUT_DIR / "3_1_dual_scheme_comparison.csv",
         [
-            scheme_comparison_row("financial_best", financial_best),
-            scheme_comparison_row("fairness_best", fairness_best),
+            {
+                **scheme_comparison_row("financial_sustainable_scheme", financial_best),
+                "summary": (
+                    "财务优先方案；优先满足利润率合规。"
+                    if financial_best.profit_compliant == 1
+                    else "财务优先方案；当前仍未满足利润率合规。"
+                ),
+                "fiscal_gap": round(financial_gap_to_break_even(financial_best), 2),
+                "joint_feasible_solution_exists": int(joint_feasible),
+            },
+            {
+                **scheme_comparison_row("fairness_priority_scheme", fairness_best),
+                "summary": (
+                    "公平优先方案；优先提高最低服务绩效/平均服务绩效。"
+                ),
+                "fiscal_gap": round(financial_gap_to_break_even(fairness_best), 2),
+                "joint_feasible_solution_exists": int(joint_feasible),
+            },
+        ],
+    )
+    write_csv(
+        OUTPUT_DIR / "3_1_scheme_status_summary.csv",
+        [
+            {
+                "financial_sustainable_scheme": "3_1_financial_best_price_scheme",
+                "fairness_priority_scheme": "3_1_fairness_best_price_scheme",
+                "joint_feasible_solution_exists": int(joint_feasible),
+                "summary": (
+                    "存在同时满足财务合规、公平可及阈值与收敛要求的方案。"
+                    if joint_feasible
+                    else "在当前预算、补贴上限和服务需求下，调价无法同时实现财务合规与公平可及，需要追加补贴、扩容或专项公益服务补贴。"
+                ),
+            }
         ],
     )
 
@@ -1128,22 +1316,30 @@ def main(max_candidate_profiles: int | None = None) -> None:
         f"{len(rescue_evaluations)} rescue candidates."
     )
     print(
-        "Financial best: "
-        f"avg service satisfaction={financial_best.average_service_satisfaction:.6f}, "
-        f"minimum satisfaction={financial_best.minimum_service_satisfaction:.6f}, "
+        "Financial sustainable scheme: "
+        f"avg service access performance={financial_best.average_service_access_performance:.6f}, "
+        f"minimum access performance={financial_best.minimum_service_access_performance:.6f}, "
         f"profit compliant={financial_best.profit_compliant}, "
         f"fairness compliant={financial_best.fair_satisfaction_compliant}, "
         f"iterations={financial_best.iteration_count}"
     )
     print(
-        "Fairness best: "
-        f"avg service satisfaction={fairness_best.average_service_satisfaction:.6f}, "
-        f"minimum satisfaction={fairness_best.minimum_service_satisfaction:.6f}, "
+        "Fairness priority scheme: "
+        f"avg service access performance={fairness_best.average_service_access_performance:.6f}, "
+        f"minimum access performance={fairness_best.minimum_service_access_performance:.6f}, "
         f"profit compliant={fairness_best.profit_compliant}, "
         f"fairness compliant={fairness_best.fair_satisfaction_compliant}, "
         f"iterations={fairness_best.iteration_count}"
     )
-    print("Current Q3 model re-evaluates primary stations by utility and uses LP-based secondary collaboration overflow under capacity constraints.")
+    print(
+        "Current Q3 model uses station-level uniform premium candidates, "
+        "re-evaluates primary stations by utility, and treats collaboration overflow as platform dispatch from the primary station."
+    )
+    if not joint_feasible:
+        print(
+            "No jointly feasible solution found under current budget, subsidy cap, and demand: "
+            "additional subsidy, capacity expansion, or dedicated public-service support is required."
+        )
 
 
 if __name__ == "__main__":

@@ -36,6 +36,8 @@ RADIUS_LIMIT = 1000.0
 DAYS_PER_MONTH = 30.0
 MONTHS_PER_YEAR = 12.0
 DEPRECIATION_YEARS = 20.0
+MIN_PROFIT_RATE = 0.0
+MAX_PROFIT_RATE = 0.08
 MAX_CANDIDATE_SCHEMES = 4 ** 10
 SATISFACTION_WEIGHTS = {"distance": 0.2, "response": 0.3, "price": 0.5}
 BASE_PRICE_SATISFACTION = 1.0
@@ -87,6 +89,10 @@ class CommunityAllocation:
     response_satisfaction: float
     price_satisfaction: float
     service_satisfaction: float
+    adjusted_demand_daily: float = 0.0
+    demand_service_ratio: float = 0.0
+    service_access_performance: float = 0.0
+    elderly_population: float = 0.0
 
 
 @dataclass
@@ -105,6 +111,12 @@ class StationMetrics:
     annual_government_subsidy_baseline: float
     annual_net_profit_before_subsidy: float
     annual_net_profit_after_policy_subsidy: float
+    annual_revenue: float = 0.0
+    annual_subsidy: float = 0.0
+    annual_total_cost: float = 0.0
+    annual_net_profit: float = 0.0
+    profit_rate: float = 0.0
+    profit_compliant: int = 0
 
 
 @dataclass
@@ -126,6 +138,19 @@ class SchemeEvaluation:
     utilization_variance: float
     annual_net_profit_before_subsidy: float
     annual_net_profit_after_policy_subsidy: float
+    weighted_served_population_coverage: float = 0.0
+    average_service_access_performance: float = 0.0
+    minimum_service_access_performance: float = 0.0
+    total_adjusted_demand_daily: float = 0.0
+    annual_revenue: float = 0.0
+    annual_subsidy: float = 0.0
+    annual_direct_cost: float = 0.0
+    annual_fixed_cost: float = 0.0
+    annual_depreciation: float = 0.0
+    annual_total_cost: float = 0.0
+    annual_net_profit: float = 0.0
+    profit_rate: float = 0.0
+    profit_compliant: int = 0
 
 
 SCALE_ORDER = {
@@ -285,31 +310,127 @@ def monthly_to_daily_load(demand: Dict[str, float]) -> float:
     return sum(demand.values()) / DAYS_PER_MONTH
 
 
+def clamp_service_satisfaction(value: float) -> float:
+    return min(1.0, max(0.6, value))
+
+
+def compute_service_metrics(
+    raw_served_demand_daily: float,
+    adjusted_demand_daily: float,
+    service_satisfaction: float,
+) -> Dict[str, float]:
+    if raw_served_demand_daily <= 1e-12:
+        return {
+            "effective_person_times_daily": 0.0,
+            "demand_service_ratio": 0.0,
+            "service_access_performance": 0.0,
+        }
+    demand_service_ratio = (
+        min(1.0, raw_served_demand_daily / adjusted_demand_daily)
+        if adjusted_demand_daily > 1e-12
+        else 0.0
+    )
+    effective_person_times_daily = raw_served_demand_daily * service_satisfaction
+    service_access_performance = (
+        effective_person_times_daily / adjusted_demand_daily
+        if adjusted_demand_daily > 1e-12
+        else 0.0
+    )
+    return {
+        "effective_person_times_daily": effective_person_times_daily,
+        "demand_service_ratio": demand_service_ratio,
+        "service_access_performance": service_access_performance,
+    }
+
+
+def subsidy_cap_per_day(scale: str) -> float:
+    return {
+        "小型": 1000.0,
+        "中型": 1800.0,
+        "大型": 2600.0,
+    }[scale]
+
+
+def compute_annual_financial_metrics(
+    scale: str,
+    build_cost_wan: float,
+    daily_fixed_cost: float,
+    raw_daily_by_service: Dict[str, float],
+    effective_daily_by_service: Dict[str, float],
+    service_costs: Dict[str, Dict[str, float]],
+) -> Dict[str, float]:
+    annual_revenue = sum(
+        effective_daily_by_service[service] * service_costs[service]["price"] * 365.0
+        for service in SERVICE_ORDER
+    )
+    annual_subsidy = min(
+        2.0
+        * sum(
+            effective_daily_by_service[service] * 365.0
+            for service in SERVICE_ORDER
+            if service != "紧急救助"
+        ),
+        subsidy_cap_per_day(scale) * 365.0,
+    )
+    annual_direct_cost = sum(
+        raw_daily_by_service[service] * service_costs[service]["direct_cost"] * 365.0
+        for service in SERVICE_ORDER
+    )
+    annual_fixed_cost = daily_fixed_cost * 365.0
+    annual_depreciation = build_cost_wan * 10000.0 / DEPRECIATION_YEARS
+    annual_total_cost = annual_direct_cost + annual_fixed_cost + annual_depreciation
+    annual_net_profit_before_subsidy = annual_revenue - annual_total_cost
+    annual_net_profit = annual_revenue + annual_subsidy - annual_total_cost
+    profit_rate = annual_net_profit / annual_total_cost if annual_total_cost > 0 else -1.0
+    profit_compliant = int(MIN_PROFIT_RATE - 1e-9 <= profit_rate <= MAX_PROFIT_RATE + 1e-9)
+    return {
+        "annual_revenue": annual_revenue,
+        "annual_subsidy": annual_subsidy,
+        "annual_direct_cost": annual_direct_cost,
+        "annual_fixed_cost": annual_fixed_cost,
+        "annual_depreciation": annual_depreciation,
+        "annual_total_cost": annual_total_cost,
+        "annual_net_profit_before_subsidy": annual_net_profit_before_subsidy,
+        "annual_net_profit": annual_net_profit,
+        "profit_rate": profit_rate,
+        "profit_compliant": profit_compliant,
+    }
+
+
+def compute_weighted_served_population_coverage(allocations: List[CommunityAllocation]) -> float:
+    numerator = 0.0
+    denominator = 0.0
+    for item in allocations:
+        population = item.elderly_population
+        if population <= 1e-12:
+            population = max(item.geographic_population_covered, item.served_population_covered)
+        denominator += population
+        numerator += population * item.demand_service_ratio
+    return numerator / denominator if denominator > 1e-12 else 0.0
+
+
 def annual_financials_for_load(
     demand: Dict[str, float],
     service_costs: Dict[str, Dict[str, float]],
     build_cost_wan: float,
     daily_fixed_cost: float,
 ) -> Dict[str, float]:
-    annual_service_revenue = sum(demand[service] * service_costs[service]["price"] for service in SERVICE_ORDER) * MONTHS_PER_YEAR
-    annual_direct_cost = sum(demand[service] * service_costs[service]["direct_cost"] for service in SERVICE_ORDER) * MONTHS_PER_YEAR
-    annual_fixed_cost = daily_fixed_cost * 365.0
-    annual_depreciation_cost = build_cost_wan * 10000.0 / DEPRECIATION_YEARS
-    annual_government_subsidy = 0.0
-    annual_net_profit = (
-        annual_service_revenue
-        + annual_government_subsidy
-        - annual_direct_cost
-        - annual_fixed_cost
-        - annual_depreciation_cost
+    daily_load = {service: demand[service] / DAYS_PER_MONTH for service in SERVICE_ORDER}
+    result = compute_annual_financial_metrics(
+        scale="小型",
+        build_cost_wan=build_cost_wan,
+        daily_fixed_cost=daily_fixed_cost,
+        raw_daily_by_service=daily_load,
+        effective_daily_by_service=daily_load,
+        service_costs=service_costs,
     )
     return {
-        "annual_service_revenue": annual_service_revenue,
-        "annual_direct_cost": annual_direct_cost,
-        "annual_fixed_cost": annual_fixed_cost,
-        "annual_depreciation_cost": annual_depreciation_cost,
-        "annual_government_subsidy": annual_government_subsidy,
-        "annual_net_profit": annual_net_profit,
+        "annual_service_revenue": result["annual_revenue"],
+        "annual_direct_cost": result["annual_direct_cost"],
+        "annual_fixed_cost": result["annual_fixed_cost"],
+        "annual_depreciation_cost": result["annual_depreciation"],
+        "annual_government_subsidy": result["annual_subsidy"],
+        "annual_net_profit": result["annual_net_profit"],
     }
 
 
@@ -386,12 +507,13 @@ def evaluate_scheme(
     scales: Dict[str, StationScale],
     satisfaction_rules: Dict[str, List[Tuple[float, float]]],
     service_costs: Dict[str, Dict[str, float]],
+    budget_limit: float = BUDGET_LIMIT,
 ) -> SchemeEvaluation | None:
     station_names = [item.community for item in communities]
     stations = scheme_from_code(station_names, scheme_code, scales)
     if not stations:
         return None
-    if total_build_cost(stations) > BUDGET_LIMIT + 1e-9:
+    if total_build_cost(stations) > budget_limit + 1e-9:
         return None
 
     response_by_station = {station.community: 1.0 for station in stations}
@@ -432,15 +554,21 @@ def evaluate_scheme(
     served_demand = sum(item.raw_served_demand_daily for item in allocations)
     effective_person_times = sum(item.effective_person_times_daily for item in allocations)
     served_allocations = [item for item in allocations if item.actually_served]
-    average_service_satisfaction = (
-        sum(item.served_population_covered * item.service_satisfaction for item in served_allocations) / served_population
-        if served_population > 0
-        else 0.0
-    )
+    average_service_satisfaction = effective_person_times / served_demand if served_demand > 1e-12 else 0.0
     minimum_service_satisfaction = min(
         (item.service_satisfaction for item in served_allocations),
         default=0.0,
     )
+    average_service_access_performance = (
+        effective_person_times / total_daily_demand
+        if total_daily_demand > 1e-12
+        else 0.0
+    )
+    minimum_service_access_performance = min(
+        (item.service_access_performance for item in allocations),
+        default=0.0,
+    )
+    weighted_served_population_coverage = compute_weighted_served_population_coverage(allocations)
     capacity_safety_rate = (
         sum(1 for item in station_metrics if item.utilization <= 0.85 + 1e-12) / len(station_metrics)
         if station_metrics
@@ -458,6 +586,15 @@ def evaluate_scheme(
     annual_net_profit_after_policy_subsidy = sum(
         item.annual_net_profit_after_policy_subsidy for item in station_metrics
     )
+    annual_revenue = sum(item.annual_revenue for item in station_metrics)
+    annual_subsidy = sum(item.annual_subsidy for item in station_metrics)
+    annual_direct_cost = sum(item.annual_direct_cost for item in station_metrics)
+    annual_fixed_cost = sum(item.annual_fixed_cost for item in station_metrics)
+    annual_depreciation = sum(item.annual_depreciation for item in station_metrics)
+    annual_total_cost = sum(item.annual_total_cost for item in station_metrics)
+    annual_net_profit = sum(item.annual_net_profit for item in station_metrics)
+    profit_rate = annual_net_profit / annual_total_cost if annual_total_cost > 1e-12 else -1.0
+    profit_compliant = int(MIN_PROFIT_RATE - 1e-9 <= profit_rate <= MAX_PROFIT_RATE + 1e-9)
     return SchemeEvaluation(
         scheme_code=scheme_code,
         stations=stations,
@@ -476,6 +613,19 @@ def evaluate_scheme(
         utilization_variance=utilization_variance,
         annual_net_profit_before_subsidy=annual_net_profit_before_subsidy,
         annual_net_profit_after_policy_subsidy=annual_net_profit_after_policy_subsidy,
+        weighted_served_population_coverage=weighted_served_population_coverage,
+        average_service_access_performance=average_service_access_performance,
+        minimum_service_access_performance=minimum_service_access_performance,
+        total_adjusted_demand_daily=total_daily_demand,
+        annual_revenue=annual_revenue,
+        annual_subsidy=annual_subsidy,
+        annual_direct_cost=annual_direct_cost,
+        annual_fixed_cost=annual_fixed_cost,
+        annual_depreciation=annual_depreciation,
+        annual_total_cost=annual_total_cost,
+        annual_net_profit=annual_net_profit,
+        profit_rate=profit_rate,
+        profit_compliant=profit_compliant,
     )
 
 
@@ -545,6 +695,10 @@ def allocate_with_response_scores(
                     response_satisfaction=0.0,
                     price_satisfaction=0.0,
                     service_satisfaction=0.0,
+                    adjusted_demand_daily=community_total_daily_demand(item),
+                    demand_service_ratio=0.0,
+                    service_access_performance=0.0,
+                    elderly_population=item.elderly_population,
                 )
             )
             continue
@@ -604,18 +758,23 @@ def allocate_with_response_scores(
             if overflow_name is not None:
                 overflow_monthly_by_station[overflow_name][service] += overflow_service_daily * DAYS_PER_MONTH
 
-        overflow_share = overflow_assigned_daily / total_daily if total_daily > 0 else 0.0
         response_score = response_by_station[primary_name]
-        unmet_share = unmet_daily / total_daily if total_daily > 0 else 0.0
         raw_served_daily = primary_assigned_daily + overflow_assigned_daily
         actually_served = int(raw_served_daily > 1e-12)
-        service_satisfaction = (
-            max(0.6, base_primary_score - OVERFLOW_PENALTY * overflow_share - 0.12 * unmet_share)
-            if actually_served
-            else 0.0
+        primary_service_satisfaction = clamp_service_satisfaction(base_primary_score)
+        overflow_service_satisfaction = clamp_service_satisfaction(base_primary_score - OVERFLOW_PENALTY)
+        service_satisfaction = 0.0
+        if actually_served:
+            service_satisfaction = (
+                primary_assigned_daily * primary_service_satisfaction
+                + overflow_assigned_daily * overflow_service_satisfaction
+            ) / raw_served_daily
+        service_metrics = compute_service_metrics(
+            raw_served_demand_daily=raw_served_daily,
+            adjusted_demand_daily=total_daily,
+            service_satisfaction=service_satisfaction,
         )
 
-        primary_effective_multiplier = service_satisfaction
         primary_increment = {
             service: daily_demand[service] * DAYS_PER_MONTH * (
                 movable_primary_ratio if service in MOVABLE_SERVICES else emergency_primary_daily / emergency_daily if service == "紧急救助" and emergency_daily > 0 else 0.0
@@ -624,7 +783,7 @@ def allocate_with_response_scores(
         }
         for service, value in primary_increment.items():
             raw_monthly_by_station[primary_name][service] += value
-            effective_monthly_by_station[primary_name][service] += value * primary_effective_multiplier
+            effective_monthly_by_station[primary_name][service] += value * primary_service_satisfaction
         if overflow_name is not None:
             overflow_increment = {
                 service: (daily_demand[service] - daily_demand[service] * movable_primary_ratio) * DAYS_PER_MONTH * movable_overflow_ratio
@@ -634,7 +793,7 @@ def allocate_with_response_scores(
             }
             for service, value in overflow_increment.items():
                 raw_monthly_by_station[overflow_name][service] += value
-                effective_monthly_by_station[overflow_name][service] += value * primary_effective_multiplier
+                effective_monthly_by_station[overflow_name][service] += value * overflow_service_satisfaction
 
         allocations.append(
             CommunityAllocation(
@@ -646,7 +805,7 @@ def allocate_with_response_scores(
                 geographic_population_covered=item.elderly_population,
                 served_population_covered=item.elderly_population if actually_served else 0.0,
                 raw_served_demand_daily=raw_served_daily,
-                effective_person_times_daily=raw_served_daily * service_satisfaction,
+                effective_person_times_daily=service_metrics["effective_person_times_daily"],
                 primary_load=primary_assigned_daily,
                 overflow_load=overflow_assigned_daily,
                 unmet_load=unmet_daily,
@@ -654,6 +813,10 @@ def allocate_with_response_scores(
                 response_satisfaction=response_score,
                 price_satisfaction=BASE_PRICE_SATISFACTION,
                 service_satisfaction=service_satisfaction,
+                adjusted_demand_daily=total_daily,
+                demand_service_ratio=service_metrics["demand_service_ratio"],
+                service_access_performance=service_metrics["service_access_performance"],
+                elderly_population=item.elderly_population,
             )
         )
 
@@ -666,34 +829,21 @@ def allocate_with_response_scores(
         utilization = total_load / station.daily_capacity if station.daily_capacity > 0 else 0.0
         next_response[station.community] = response_satisfaction(utilization, response_rules)
 
-        annual_service_revenue = sum(
-            effective_monthly_by_station[station.community][service] * service_costs[service]["price"]
+        raw_daily_by_service = {
+            service: raw_monthly_by_station[station.community][service] / DAYS_PER_MONTH
             for service in SERVICE_ORDER
-        ) * MONTHS_PER_YEAR
-        annual_direct_cost = sum(
-            raw_monthly_by_station[station.community][service] * service_costs[service]["direct_cost"]
+        }
+        effective_daily_by_service = {
+            service: effective_monthly_by_station[station.community][service] / DAYS_PER_MONTH
             for service in SERVICE_ORDER
-        ) * MONTHS_PER_YEAR
-        annual_fixed_cost = station.daily_fixed_cost * 365.0
-        annual_depreciation = station.build_cost_wan * 10000.0 / DEPRECIATION_YEARS
-        monthly_effective_non_emergency = sum(
-            effective_monthly_by_station[station.community][service]
-            for service in SERVICE_ORDER
-            if service != "紧急救助"
-        )
-        annual_government_subsidy_baseline = min(
-            monthly_effective_non_emergency * 2.0 * MONTHS_PER_YEAR,
-            subsidy_cap_per_day(station.scale) * 365.0,
-        )
-        annual_net_profit_before_subsidy = (
-            annual_service_revenue
-            - annual_direct_cost
-            - annual_fixed_cost
-            - annual_depreciation
-        )
-        annual_net_profit_after_policy_subsidy = (
-            annual_net_profit_before_subsidy
-            + annual_government_subsidy_baseline
+        }
+        financials = compute_annual_financial_metrics(
+            scale=station.scale,
+            build_cost_wan=station.build_cost_wan,
+            daily_fixed_cost=station.daily_fixed_cost,
+            raw_daily_by_service=raw_daily_by_service,
+            effective_daily_by_service=effective_daily_by_service,
+            service_costs=service_costs,
         )
         station_metrics.append(
             StationMetrics(
@@ -704,13 +854,19 @@ def allocate_with_response_scores(
                 assigned_overflow_load=overflow_load,
                 total_load=total_load,
                 utilization=utilization,
-                annual_service_revenue=annual_service_revenue,
-                annual_direct_cost=annual_direct_cost,
-                annual_fixed_cost=annual_fixed_cost,
-                annual_depreciation=annual_depreciation,
-                annual_government_subsidy_baseline=annual_government_subsidy_baseline,
-                annual_net_profit_before_subsidy=annual_net_profit_before_subsidy,
-                annual_net_profit_after_policy_subsidy=annual_net_profit_after_policy_subsidy,
+                annual_service_revenue=financials["annual_revenue"],
+                annual_direct_cost=financials["annual_direct_cost"],
+                annual_fixed_cost=financials["annual_fixed_cost"],
+                annual_depreciation=financials["annual_depreciation"],
+                annual_government_subsidy_baseline=financials["annual_subsidy"],
+                annual_net_profit_before_subsidy=financials["annual_net_profit_before_subsidy"],
+                annual_net_profit_after_policy_subsidy=financials["annual_net_profit"],
+                annual_revenue=financials["annual_revenue"],
+                annual_subsidy=financials["annual_subsidy"],
+                annual_total_cost=financials["annual_total_cost"],
+                annual_net_profit=financials["annual_net_profit"],
+                profit_rate=financials["profit_rate"],
+                profit_compliant=financials["profit_compliant"],
             )
         )
 
@@ -738,14 +894,6 @@ def choose_overflow_station(
     if not candidates:
         return None
     return sorted(candidates, key=lambda item: (-item[3], item[1], item[0]))[0][0]
-
-
-def subsidy_cap_per_day(scale: str) -> float:
-    return {
-        "小型": 1000.0,
-        "中型": 1800.0,
-        "大型": 2600.0,
-    }[scale]
 
 
 def rank_reachable_stations(

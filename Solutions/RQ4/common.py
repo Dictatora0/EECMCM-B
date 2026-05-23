@@ -50,6 +50,20 @@ with temporarily_bind_common(RQ3_COMMON):
     RQ3_MAIN = load_module("rq4_rq3_main_module", ROOT / "Solutions" / "RQ3" / "3_1.py")
 
 SERVICE_ORDER = RQ1_COMMON.SERVICE_ORDER
+BASELINE_PARAMETERS = {
+    "elderly_growth_rate": 0.07,
+    "p12": 0.045,
+    "p23": 0.10,
+    "fixed_cost_multiplier": 1.0,
+    "budget_limit": 120.0,
+}
+CAPACITY_SAFE_THRESHOLD = 0.85
+CACHE_VERSION = "rq4_scenarios_v3"
+PARAMETER_ALIASES = {
+    "elder_growth_rate": "elderly_growth_rate",
+    "self_to_semi": "p12",
+    "semi_to_disabled": "p23",
+}
 
 
 @dataclass(frozen=True)
@@ -72,76 +86,161 @@ class ScenarioResult:
 def scenario_definitions() -> List[ScenarioDefinition]:
     return [
         ScenarioDefinition(code="S0", name="基准情景", parameter_changes={}),
-        ScenarioDefinition(code="S1", name="老人增长率提高", parameter_changes={"elder_growth_rate": 0.08}),
-        ScenarioDefinition(
-            code="S2",
-            name="转移概率变化",
-            parameter_changes={"self_to_semi": 0.055, "semi_to_disabled": 0.095},
-        ),
+        ScenarioDefinition(code="S1", name="老人增长率提高", parameter_changes={"elderly_growth_rate": 0.08}),
+        ScenarioDefinition(code="S2", name="转移概率变化", parameter_changes={"p12": 0.055, "p23": 0.095}),
         ScenarioDefinition(code="S3", name="固定成本上升", parameter_changes={"fixed_cost_multiplier": 1.2}),
         ScenarioDefinition(code="S4", name="预算提高", parameter_changes={"budget_limit": 140.0}),
     ]
 
 
+def scenario_parameter_dict(scenario: ScenarioDefinition) -> Dict[str, float]:
+    normalized_changes = {
+        PARAMETER_ALIASES.get(key, key): value
+        for key, value in scenario.parameter_changes.items()
+    }
+    return {**BASELINE_PARAMETERS, **normalized_changes}
+
+
 def scenario_requires_rerun_from_rq1(scenario: ScenarioDefinition) -> bool:
-    keys = set(scenario.parameter_changes)
-    return bool({"elder_growth_rate", "self_to_semi", "semi_to_disabled"} & keys)
+    normalized_keys = {PARAMETER_ALIASES.get(key, key) for key in scenario.parameter_changes}
+    return bool({"elderly_growth_rate", "p12", "p23"} & normalized_keys)
 
 
-def compute_relative_change(new_value: float, baseline_value: float) -> float:
+def scenario_execution_path(scenario: ScenarioDefinition) -> str:
+    return "rerun_rq1_rq2_rq3" if scenario_requires_rerun_from_rq1(scenario) or scenario.code == "S0" else "reuse_rq1_rerun_rq2_rq3"
+
+
+def compute_relative_change(new_value: float, baseline_value: float) -> float | str:
     if abs(baseline_value) <= 1e-12:
-        return 0.0 if abs(new_value) <= 1e-12 else 1.0
+        return "NA"
     return (new_value - baseline_value) / baseline_value
 
 
-def compute_average_relative_parameter_change(
-    baseline_values: Dict[str, float],
-    scenario_values: Dict[str, float],
+def perturbed_parameter_label(scenario: ScenarioDefinition) -> str:
+    keys = {PARAMETER_ALIASES.get(key, key) for key in scenario.parameter_changes}
+    if keys == {"elderly_growth_rate"}:
+        return "elderly_growth_rate"
+    if keys == {"p12", "p23"}:
+        return "transition_probabilities"
+    if keys == {"fixed_cost_multiplier"}:
+        return "fixed_cost_multiplier"
+    if keys == {"budget_limit"}:
+        return "budget_limit"
+    return "+".join(sorted(keys)) if keys else "baseline"
+
+
+def compute_scenario_parameter_relative_change(
+    scenario: ScenarioDefinition,
+    baseline_parameters: Dict[str, float],
 ) -> float:
-    keys = sorted(set(baseline_values) & set(scenario_values))
-    if not keys:
+    if not scenario.parameter_changes:
         return 0.0
-    values = []
-    for key in keys:
-        baseline = baseline_values[key]
-        scenario = scenario_values[key]
+    values: List[float] = []
+    normalized_baseline = {
+        PARAMETER_ALIASES.get(key, key): value
+        for key, value in baseline_parameters.items()
+    }
+    normalized_changes = {
+        PARAMETER_ALIASES.get(key, key): value
+        for key, value in scenario.parameter_changes.items()
+    }
+    for key in sorted(normalized_changes):
+        baseline = float(normalized_baseline[key])
+        scenario_value = float(normalized_changes[key])
         if abs(baseline) <= 1e-12:
-            values.append(0.0 if abs(scenario) <= 1e-12 else 1.0)
-        else:
-            values.append(abs(scenario - baseline) / abs(baseline))
+            raise ValueError(f"Baseline parameter {key} is zero; cannot compute relative change.")
+        values.append(abs(scenario_value - baseline) / abs(baseline))
     return sum(values) / len(values)
 
 
-def compute_sensitivity_coefficient(metric_relative_change: float, parameter_relative_change: float) -> float:
-    if abs(parameter_relative_change) <= 1e-12:
-        return 0.0
-    return metric_relative_change / parameter_relative_change
+def compute_sensitivity_coefficient(
+    metric_relative_change: float | str,
+    parameter_relative_change: float,
+) -> float | str:
+    if metric_relative_change == "NA" or abs(parameter_relative_change) <= 1e-12:
+        return "NA"
+    return float(metric_relative_change) / parameter_relative_change
 
 
-def compute_location_stability(baseline_locations: Set[str], scenario_locations: Set[str]) -> float:
-    if not baseline_locations:
+def classify_sensitivity_level(sensitivity_coefficient: float | str) -> str:
+    if sensitivity_coefficient == "NA":
+        return "NA"
+    value = abs(float(sensitivity_coefficient))
+    if value < 0.3:
+        return "low"
+    if value < 0.8:
+        return "medium"
+    return "high"
+
+
+def compute_jaccard_location_stability(baseline_locations: Set[str], scenario_locations: Set[str]) -> float:
+    union = baseline_locations | scenario_locations
+    if not union:
         return 1.0
-    return len(baseline_locations & scenario_locations) / len(baseline_locations)
+    return len(baseline_locations & scenario_locations) / len(union)
 
 
-def compute_coverage_stability(baseline_coverage: float, scenario_coverage: float) -> float:
-    return max(0.0, 1.0 - abs(scenario_coverage - baseline_coverage))
+def build_station_scale_map(station_plan: str) -> Dict[str, str]:
+    result: Dict[str, str] = {}
+    if not station_plan:
+        return result
+    for token in station_plan.split(";"):
+        if not token:
+            continue
+        community, scale = token.split("-", 1)
+        result[community] = scale
+    return result
 
 
-def compute_satisfaction_stability(baseline_satisfaction: float, scenario_satisfaction: float) -> float:
-    return max(0.0, 1.0 - abs(scenario_satisfaction - baseline_satisfaction))
+def build_station_plan_text(scale_map: Dict[str, str]) -> str:
+    return ";".join(f"{community}-{scale_map[community]}" for community in sorted(scale_map))
 
 
-def compute_financial_compliance_stability(financial_flags: Sequence[int]) -> float:
+def compute_layout_scale_consistency(
+    baseline_scale_map: Dict[str, str],
+    scenario_scale_map: Dict[str, str],
+) -> float:
+    union = set(baseline_scale_map) | set(scenario_scale_map)
+    if not union:
+        return 1.0
+    consistent = sum(
+        1
+        for community in union
+        if baseline_scale_map.get(community) == scenario_scale_map.get(community)
+        and baseline_scale_map.get(community) is not None
+        and scenario_scale_map.get(community) is not None
+    )
+    return consistent / len(union)
+
+
+def compute_stability_from_metric(baseline_value: float, scenario_value: float) -> float:
+    return max(0.0, 1.0 - abs(scenario_value - baseline_value))
+
+
+def compute_financial_compliance_rate(financial_flags: Sequence[int]) -> float:
     if not financial_flags:
         return 1.0
-    return sum(1 for flag in financial_flags if flag == 1) / len(financial_flags)
+    return sum(1 for flag in financial_flags if int(flag) == 1) / len(financial_flags)
 
 
-def compute_capacity_safety_stability(utilizations: Sequence[float], threshold: float = 0.85) -> float:
+def compute_capacity_safety_rate(utilizations: Sequence[float], threshold: float = CAPACITY_SAFE_THRESHOLD) -> float:
     if not utilizations:
         return 1.0
-    return sum(1 for value in utilizations if value <= threshold + 1e-12) / len(utilizations)
+    return sum(1 for value in utilizations if float(value) <= threshold + 1e-12) / len(utilizations)
+
+
+def compute_max_station_utilization(utilizations: Sequence[float]) -> float:
+    return max((float(value) for value in utilizations), default=0.0)
+
+
+def fully_safe_from_utilizations(utilizations: Sequence[float], threshold: float = CAPACITY_SAFE_THRESHOLD) -> int:
+    return int(compute_max_station_utilization(utilizations) <= threshold + 1e-12)
+
+
+def round_or_na(value: float | str, digits: int = 6) -> float | str:
+    if value == "NA":
+        return value
+    return round(float(value), digits)
 
 
 def write_csv(path: Path, rows: List[Dict[str, object]]) -> None:
@@ -165,109 +264,158 @@ def station_location_set(q2_evaluation) -> Set[str]:
     return {station.community for station in q2_evaluation.stations}
 
 
-def q2_summary_row(scenario: ScenarioDefinition, scheme_label: str, evaluation) -> Dict[str, object]:
+def q2_summary_row(scenario: ScenarioDefinition, evaluation) -> Dict[str, object]:
+    row = RQ2_MAIN.evaluation_to_summary_row(evaluation)
+    parameters = scenario_parameter_dict(scenario)
     return {
-        "scenario_code": scenario.code,
-        "scenario_name": scenario.name,
-        "scheme_label": scheme_label,
-        "station_count": len(evaluation.stations),
-        "station_locations": ";".join(sorted(station.community for station in evaluation.stations)),
-        "build_cost_wan": round(sum(station.build_cost_wan for station in evaluation.stations), 4),
-        "geographic_population_coverage": round(evaluation.geographic_population_coverage, 6),
-        "served_population_coverage": round(evaluation.served_population_coverage, 6),
-        "served_demand_coverage": round(evaluation.served_demand_coverage, 6),
-        "average_service_satisfaction": round(evaluation.average_service_satisfaction, 6),
-        "minimum_service_satisfaction": round(evaluation.minimum_service_satisfaction, 6),
-        "annual_net_profit_before_subsidy": round(evaluation.annual_net_profit_before_subsidy, 2),
-        "annual_net_profit_after_policy_subsidy": round(evaluation.annual_net_profit_after_policy_subsidy, 2),
-        "capacity_safety_rate": round(evaluation.capacity_safety_rate, 6),
-        "max_station_utilization": round(evaluation.max_station_utilization, 6),
-        "fully_safe": evaluation.fully_safe,
+        "scenario": scenario.code,
+        "budget_limit": parameters["budget_limit"],
+        "fixed_cost_multiplier": parameters["fixed_cost_multiplier"],
+        "p12": parameters["p12"],
+        "p23": parameters["p23"],
+        "elderly_growth_rate": parameters["elderly_growth_rate"],
+        "station_plan": row["scheme_detail"],
+        "total_construction_cost": row["build_cost_wan"],
+        "geographic_population_coverage": row["geographic_population_coverage"],
+        "served_population_coverage": row["served_population_coverage"],
+        "weighted_served_population_coverage": row["weighted_served_population_coverage"],
+        "served_demand_coverage": row["served_demand_coverage"],
+        "average_service_access_performance": row["average_service_access_performance"],
+        "minimum_service_access_performance": row["minimum_service_access_performance"],
+        "capacity_safety_rate": row["capacity_safety_rate"],
+        "max_station_utilization": row["max_station_utilization"],
+        "fully_safe": row["fully_safe"],
+        "annual_net_profit_before_subsidy": row["annual_net_profit_before_subsidy"],
+        "annual_net_profit_after_policy_subsidy": row["annual_net_profit_after_policy_subsidy"],
     }
 
 
-def q3_summary_row(scenario: ScenarioDefinition, scheme_label: str, evaluation) -> Dict[str, object]:
+def q3_summary_row(
+    scenario: ScenarioDefinition,
+    scheme_type: str,
+    evaluation,
+    station_plan: str,
+    fiscal_gap_if_any: float,
+) -> Dict[str, object]:
+    summary = RQ3_MAIN.evaluation_summary_row(evaluation)
+    parameters = scenario_parameter_dict(scenario)
     return {
-        "scenario_code": scenario.code,
-        "scenario_name": scenario.name,
-        "scheme_label": scheme_label,
-        **RQ3_MAIN.evaluation_summary_row(evaluation),
+        "scenario": scenario.code,
+        "budget_limit": parameters["budget_limit"],
+        "fixed_cost_multiplier": parameters["fixed_cost_multiplier"],
+        "p12": parameters["p12"],
+        "p23": parameters["p23"],
+        "elderly_growth_rate": parameters["elderly_growth_rate"],
+        "scheme_type": scheme_type,
+        "station_plan": station_plan,
+        "average_service_access_performance": summary["average_service_access_performance"],
+        "minimum_service_access_performance": summary["minimum_service_access_performance"],
+        "annual_government_subsidy": summary["annual_government_subsidy"],
+        "annual_net_profit": summary["annual_net_profit"],
+        "profit_rate": summary["profit_rate"],
+        "profit_compliant": summary["profit_compliant"],
+        "converged": summary["converged"],
+        "iterations": summary["iterations"],
+        "fiscal_gap_if_any": round(fiscal_gap_if_any, 2),
     }
 
 
 def sensitivity_row(
     scenario: ScenarioDefinition,
-    scheme_label: str,
     metric_name: str,
     baseline_value: float,
     scenario_value: float,
     baseline_parameters: Dict[str, float],
-    scenario_parameters: Dict[str, float],
 ) -> Dict[str, object]:
-    metric_change = compute_relative_change(scenario_value, baseline_value)
-    parameter_change = compute_average_relative_parameter_change(baseline_parameters, scenario_parameters)
+    absolute_change = scenario_value - baseline_value
+    metric_relative_change = compute_relative_change(scenario_value, baseline_value)
+    parameter_relative_change = compute_scenario_parameter_relative_change(scenario, baseline_parameters)
+    coefficient = compute_sensitivity_coefficient(metric_relative_change, parameter_relative_change)
     return {
-        "scenario_code": scenario.code,
-        "scenario_name": scenario.name,
-        "scheme_label": scheme_label,
-        "metric_name": metric_name,
-        "baseline_value": round(baseline_value, 6),
-        "scenario_value": round(scenario_value, 6),
-        "metric_relative_change": round(metric_change, 6),
-        "parameter_relative_change": round(parameter_change, 6),
-        "sensitivity_coefficient": round(
-            compute_sensitivity_coefficient(metric_change, parameter_change),
-            6,
-        ),
+        "scenario": scenario.code,
+        "perturbed_parameter": perturbed_parameter_label(scenario),
+        "parameter_relative_change": round(parameter_relative_change, 6),
+        "metric": metric_name,
+        "baseline_value": round(float(baseline_value), 6),
+        "scenario_value": round(float(scenario_value), 6),
+        "metric_absolute_change": round(float(absolute_change), 6),
+        "metric_relative_change": round_or_na(metric_relative_change, 6),
+        "sensitivity_coefficient": round_or_na(coefficient, 6),
+        "sensitivity_level": classify_sensitivity_level(coefficient),
     }
 
 
 def robustness_row(
     scenario: ScenarioDefinition,
-    scheme_label: str,
-    baseline_q2,
-    scenario_q2,
-    q3_evaluation,
+    baseline_station_plan: str,
+    scenario_station_plan: str,
+    baseline_q2_metric_map: Dict[str, float],
+    scenario_q2_metric_map: Dict[str, float],
+    baseline_q3_financial_performance: float,
+    scenario_q3_financial_performance: float,
+    baseline_q3_fairness_performance: float,
+    scenario_q3_fairness_performance: float,
+    station_profit_flags: Sequence[int],
+    station_utilizations: Sequence[float],
 ) -> Dict[str, object]:
-    station_profit_flags = [row["profit_compliant"] for row in q3_evaluation.station_financials]
-    station_profit_rates = [row["profit_rate"] for row in q3_evaluation.station_financials]
+    baseline_scale_map = build_station_scale_map(baseline_station_plan)
+    scenario_scale_map = build_station_scale_map(scenario_station_plan)
+    max_station_utilization = compute_max_station_utilization(station_utilizations)
     return {
-        "scenario_code": scenario.code,
-        "scenario_name": scenario.name,
-        "scheme_label": scheme_label,
-        "RS_loc": round(
-            compute_location_stability(station_location_set(baseline_q2), station_location_set(scenario_q2)),
-            6,
-        ),
-        "RS_cov": round(
-            compute_coverage_stability(
-                baseline_q2.served_demand_coverage,
-                scenario_q2.served_demand_coverage,
+        "scenario": scenario.code,
+        "RS_loc": round(compute_jaccard_location_stability(set(baseline_scale_map), set(scenario_scale_map)), 6),
+        "RS_layout": round(compute_layout_scale_consistency(baseline_scale_map, scenario_scale_map), 6),
+        "geographic_population_coverage_stability": round(
+            compute_stability_from_metric(
+                baseline_q2_metric_map["geographic_population_coverage"],
+                scenario_q2_metric_map["geographic_population_coverage"],
             ),
             6,
         ),
-        "RS_sat": round(
-            compute_satisfaction_stability(
-                baseline_q2.average_service_satisfaction,
-                scenario_q2.average_service_satisfaction,
+        "served_population_coverage_stability": round(
+            compute_stability_from_metric(
+                baseline_q2_metric_map["served_population_coverage"],
+                scenario_q2_metric_map["served_population_coverage"],
             ),
             6,
         ),
-        "RS_fin": round(compute_financial_compliance_stability(station_profit_flags), 6),
-        "RS_cap": round(
-            compute_capacity_safety_stability(
-                [metric.utilization for metric in scenario_q2.station_metrics],
-                threshold=0.85,
+        "weighted_served_population_coverage_stability": round(
+            compute_stability_from_metric(
+                baseline_q2_metric_map["weighted_served_population_coverage"],
+                scenario_q2_metric_map["weighted_served_population_coverage"],
             ),
             6,
         ),
-        "profit_compliant": q3_evaluation.profit_compliant,
-        "fair_satisfaction_compliant": q3_evaluation.fair_satisfaction_compliant,
-        "minimum_service_satisfaction": round(q3_evaluation.minimum_service_satisfaction, 6),
-        "max_station_utilization": round(scenario_q2.max_station_utilization, 6),
-        "capacity_safety_rate": round(scenario_q2.capacity_safety_rate, 6),
-        "avg_station_profit_rate": round(
-            sum(station_profit_rates) / len(station_profit_rates) if station_profit_rates else 0.0,
+        "served_demand_coverage_stability": round(
+            compute_stability_from_metric(
+                baseline_q2_metric_map["served_demand_coverage"],
+                scenario_q2_metric_map["served_demand_coverage"],
+            ),
             6,
         ),
+        "q2_service_access_performance_stability": round(
+            compute_stability_from_metric(
+                baseline_q2_metric_map["average_service_access_performance"],
+                scenario_q2_metric_map["average_service_access_performance"],
+            ),
+            6,
+        ),
+        "q3_financial_scheme_performance_stability": round(
+            compute_stability_from_metric(
+                baseline_q3_financial_performance,
+                scenario_q3_financial_performance,
+            ),
+            6,
+        ),
+        "q3_fairness_scheme_performance_stability": round(
+            compute_stability_from_metric(
+                baseline_q3_fairness_performance,
+                scenario_q3_fairness_performance,
+            ),
+            6,
+        ),
+        "financial_compliance_rate": round(compute_financial_compliance_rate(station_profit_flags), 6),
+        "capacity_safety_rate": round(compute_capacity_safety_rate(station_utilizations), 6),
+        "max_station_utilization": round(max_station_utilization, 6),
+        "fully_safe": fully_safe_from_utilizations(station_utilizations),
     }

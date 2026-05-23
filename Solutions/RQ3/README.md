@@ -1,210 +1,136 @@
-# RQ3 接口说明
+# RQ3 接口与口径说明
 
-本文档用于在实现问题3前固定上游输入接口与指标口径，避免后续代码阶段重新解释 RQ1、RQ2 的输出字段。
+本文档与 `Solutions/RQ3/3_1.py` 当前实现保持一致，用于统一问题3的输入、定价、固定点迭代、服务绩效与财务口径。
 
-## 1. 默认上游入口
+## 1. 上游输入
 
-RQ3 默认接入问题2主方案，不直接读取安全优先方案。
+RQ3 默认读取问题2主方案：
 
-- 默认方案文件：
-  - `Solutions/RQ2/outputs/2_1_best_scheme_summary.csv`
-  - `Solutions/RQ2/outputs/2_1_best_scheme_stations.csv`
-  - `Solutions/RQ2/outputs/2_1_best_scheme_allocations.csv`
-- 备选稳健性方案：
-  - `Solutions/RQ2/outputs/2_1_safe_scheme_summary.csv`
-  - `Solutions/RQ2/outputs/2_1_safe_scheme_stations.csv`
-  - `Solutions/RQ2/outputs/2_1_safe_scheme_allocations.csv`
+- `Solutions/RQ2/outputs/2_1_best_scheme_summary.csv`
+- `Solutions/RQ2/outputs/2_1_best_scheme_stations.csv`
+- `Solutions/RQ2/outputs/2_1_best_scheme_allocations.csv`
 
-若切换到安全优先方案，必须在输出文件名、日志和论文表述中显式标注，不能静默替换默认主方案。
+安全优先方案只能作为备选输入显式切换，不能在文档或结果中静默替代主方案。
 
-## 2. RQ1 必读高精度文件
+RQ3 只允许读取 RQ1 高精度文件：
 
-RQ3 只允许使用高精度输入，不允许回退到取整展示表。
+- `rq1_high_precision_metadata.json`
+- `1_1_high_precision_year5_population.csv`
+- `1_3_high_precision_adjusted_demand.csv`
+- `1_3_high_precision_adjusted_demand_detail.csv`
 
-### 2.1 必需文件
+## 2. 四类核心量
 
-- `Solutions/RQ1/outputs/rq1_high_precision_metadata.json`
-- `Solutions/RQ1/outputs/1_1_high_precision_year5_population.csv`
-- `Solutions/RQ1/outputs/1_3_high_precision_adjusted_demand.csv`
-- `Solutions/RQ1/outputs/1_3_high_precision_adjusted_demand_detail.csv`
+问题2和问题3统一使用以下四类量：
 
-### 2.2 可选文件
+- `raw_served_demand`
+  表示站点实际承接的原始服务需求人次，用于容量占用和直接成本。
+- `effective_person_times`
+  定义为 `raw_served_demand * service_satisfaction`，用于收入、补贴和绩效评价。
+- `service_satisfaction`
+  仅对已服务对象定义，范围为 `[0.6, 1.0]`；未服务对象记为 `0`。
+- `service_access_performance`
+  定义为 `service_satisfaction * min(1, raw_served_demand / adjusted_demand)`，范围为 `[0, 1]`；零服务时记为 `0`。
 
-- `Solutions/RQ1/outputs/1_2_high_precision_theoretical_demand.csv`
-  - 仅用于“理论需求 vs 可支付需求 vs 实际有效服务”对比分析，不作为主优化约束输入。
-- `Solutions/RQ1/outputs/1_1_high_precision_population_by_year.csv`
-  - 仅用于趋势图或问题4联动分析；若被调用，必须显式筛选 `year == 5` 后再传给 RQ3。
+输出层面不再把 `service_access_performance` 叫作“满意度”。
 
-### 2.3 字段要求
+## 3. 覆盖率口径
 
-`1_1_high_precision_year5_population.csv`
+问题2和问题3同时保留以下覆盖率：
 
-- 必含字段：`year, community, self_care, semi_disabled, disabled, elderly_total, new_entrants`
-- 断言要求：
-  - 全部记录满足 `year == 5`
-  - 恰好覆盖 10 个小区
-
-`1_3_high_precision_adjusted_demand.csv`
-
-- 必含字段：`community, service, adjusted_monthly_demand`
-- 断言要求：
-  - 恰好覆盖 `10 × 6 = 60` 条小区-服务记录
-
-`1_3_high_precision_adjusted_demand_detail.csv`
-
-- 必含字段：
-  - `community`
-  - `care_level`
-  - `service`
-  - `monthly_income`
-  - `budget_limit`
-  - `theoretical_per_person`
-  - `adjusted_per_person`
-  - `adjustment_scale`
-  - `population`
-  - `adjusted_monthly_demand`
-- 断言要求：
-  - 恰好覆盖 `10 × 3 × 6 = 180` 条小区-老人类型-服务记录
-  - 至少部分 `population` 或 `adjusted_monthly_demand` 为非整数小数，用于防止误读取整表
-
-## 3. RQ2 必读文件与字段
-
-### 3.1 方案总表
-
-`2_1_best_scheme_summary.csv` 必含字段：
-
-- `scheme_type`
-- `scheme_code`
-- `scheme_detail`
-- `station_count`
-- `build_cost_wan`
 - `geographic_population_coverage`
 - `served_population_coverage`
+- `weighted_served_population_coverage`
 - `served_demand_coverage`
-- `average_service_satisfaction`
-- `minimum_service_satisfaction`
-- `total_raw_served_demand_daily`
-- `total_effective_person_times_daily`
-- `capacity_safety_rate`
-- `max_station_utilization`
-- `fully_safe`
-- `fully_served_community_count`
-- `total_unmet_daily_demand`
-- `utilization_variance`
-- `annual_net_profit_before_subsidy`
-- `annual_net_profit_after_policy_subsidy`
 
-用途说明：
+其中：
 
-- `summary` 主要用于读取方案编码、站点数量、基线覆盖指标与问题2级别的汇总校验。
-- `annual_net_profit_*` 只作为问题2基准运营评价，不直接作为问题3约束输入。
+`weighted_served_population_coverage = sum_i P_i * min(1, q_i / d_i) / sum_i P_i`
 
-### 3.2 站点表
+这里 `P_i` 为第5年高精度老年人口，`q_i` 为小区实际承接服务量，`d_i` 为消费约束后的总需求。
 
-`2_1_best_scheme_stations.csv` 必含字段：
+## 4. 财务口径
 
-- `station_community`
-- `scale`
-- `daily_capacity`
-- `assigned_primary_load`
-- `assigned_overflow_load`
-- `total_load`
-- `utilization`
-- `annual_service_revenue`
-- `annual_direct_cost`
-- `annual_fixed_cost`
-- `annual_depreciation`
-- `annual_government_subsidy_baseline`
-- `annual_net_profit_before_subsidy`
-- `annual_net_profit_after_policy_subsidy`
+问题2和问题3统一采用：
 
-用途说明：
+- `annual_revenue = effective_person_times * price`
+- `annual_subsidy = min(2 * effective_person_times_excluding_emergency, subsidy_cap)`
+- `annual_direct_cost = raw_served_demand * direct_cost`
+- `annual_fixed_cost = 365 * daily_fixed_cost`
+- `annual_depreciation = construction_cost_yuan / 20`
+- `annual_total_cost = annual_direct_cost + annual_fixed_cost + annual_depreciation`
+- `annual_net_profit = annual_revenue + annual_subsidy - annual_total_cost`
+- `profit_rate = annual_net_profit / annual_total_cost`
+- `profit_compliant = 1[0 <= profit_rate <= 0.08]`
 
-- `station_community` 与 `scale` 用于构造 RQ3 的既定站点集合与站点规模。
-- `daily_capacity` 是问题3容量约束的直接上游输入。
-- 问题3重新定价后需重算收入、补贴和利润率，不能直接复用这些财务值。
+直接成本始终由原始服务量驱动，不允许改回有效人次口径。
 
-### 3.3 小区分配表
+## 5. 定价模型
 
-`2_1_best_scheme_allocations.csv` 必含字段：
+当前代码实现的是站点级统一溢价候选，不是“站点-服务项目级独立定价”。
 
-- `community`
-- `primary_station`
-- `overflow_station`
-- `geographic_reachable`
-- `actually_served`
-- `geographic_population_covered`
-- `served_population_covered`
-- `raw_served_demand_daily`
-- `effective_person_times_daily`
-- `primary_load_daily`
-- `overflow_load_daily`
-- `unmet_load_daily`
-- `geographic_satisfaction`
-- `response_satisfaction`
-- `price_satisfaction`
-- `service_satisfaction`
+价格方案写为：
 
-用途说明：
+- `p_{j,r} = alpha_j * p_r^0, r = 1,...,5`
+- `p_{j,6} = 0`
 
-- `primary_station` 和 `overflow_station` 作为问题3初始主站/协同站基线，不代表定价后必须固定不变。
-- `service_satisfaction` 仅对 `actually_served = 1` 的小区有效，用作固定点迭代初值。
-- 若 `actually_served = 0` 或 `raw_served_demand_daily <= 0`，则 RQ3 中该小区满意度初值必须按 0 处理。
+其中：
 
-## 4. 统一口径
+- `alpha_j ∈ {1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.8, 2.0}`
 
-RQ3 必须沿用 RQ2 已经固定的四层概念，不能混用。
+若后续扩展为服务项目独立定价，只能作为扩展模型另写。
 
-- 地理可达：1000 米内存在可达站点。
-- 实际服务：需求被主站或协同站容量承接。
-- 有效服务：实际服务人次乘以满意度后的有效完成量。
-- 服务满意度：仅对实际服务对象计算；未服务对象在综合绩效中按 0 处理。
+## 6. 主站与协同分流解释
 
-## 5. 容量与财务口径
+当前实现遵循：
 
-### 5.1 容量口径
+1. 老人先按综合效用选择满意度最高的主服务站。
+2. 若主站容量不足，仅允许可移动服务通过协同站点分流。
+3. 该“分流”表示主站或街道平台派单协同，不表示老人主动改选其他站点。
 
-由于附件3仅给出“日最大服务人次”，RQ3 与 RQ2 一致，采用同质化服务人次容量：
+这也是结果解释和论文表述必须保持的口径。
 
-$$
-L_j=\sum_i\sum_r Q_{ijr}\leq Cap_j
-$$
+## 7. 固定点迭代口径
 
-当前阶段不要引入服务项目工作量权重，也不要将容量解释为加权工时容量。
+当前实现流程为：
 
-### 5.2 财务口径
+1. 给定站点级价格方案 `alpha_j`。
+2. 计算价格满意度并据此更新消费约束需求。
+3. 按距离、响应、价格三类效用选择主站和备选协同站。
+4. 在线性规划中处理容量约束下的协同分流。
+5. 按站点利用率更新响应满意度。
+6. 更新 `service_satisfaction` 与 `service_access_performance`。
+7. 若 `max_abs_delta < 1e-4` 则停止。
+8. 若检测到两周期振荡，则使用阻尼：
+   `A_next = 0.5 * A_candidate + 0.5 * A_prev`
 
-问题3统一采用以下规则：
+输出保留：
 
-- 收入：由有效服务人次驱动。
-- 补贴：由非紧急服务的有效服务人次驱动，并受单站每日补贴上限约束。
-- 直接支出：由实际承接的原始服务量驱动，不因满意度下降而减少。
-- 固定成本与折旧：沿用问题2站点规模对应参数。
+- `converged`
+- `iterations`
+- `max_satisfaction_delta`
+- `damping_used`
 
-对应到记号上：
+## 8. 双方案输出
 
-- `raw served person-times` -> `Q`
-- `effective person-times` -> `E = Q × satisfaction`
+RQ3 至少输出两类方案：
 
-## 6. RQ3 实现前建议增加的读取断言
+- `financial_sustainable_scheme`
+  优先满足利润率合规，报告平均/最低服务绩效、利润、利润率、补贴、收敛状态。
+- `fairness_priority_scheme`
+  优先提高最低或平均服务绩效，报告其利润率合规性、财政缺口、收敛状态。
 
-- 文件名不得包含 `rounded`、`report`、`summary_rounded`
-- 必须先校验 `rq1_high_precision_metadata.json`
-- year5 人口文件必须恰好 10 行小区记录
-- 小区分配表必须恰好 10 行记录
-- 站点表行数必须等于 `summary.station_count`
-- 至少部分人口或需求值应保留非整数小数
+若不存在同时满足：
 
-## 7. 默认实现顺序
+- `profit_compliant = 1`
+- `minimum_service_access_performance >= 阈值`
+- `converged = 1`
 
-推荐问题3实现按以下顺序接线：
+的方案，则输出：
 
-1. 读取 `rq1_high_precision_metadata.json`
-2. 读取 `1_1_high_precision_year5_population.csv`
-3. 读取 `1_3_high_precision_adjusted_demand.csv`
-4. 读取 `1_3_high_precision_adjusted_demand_detail.csv`
-5. 读取 `2_1_best_scheme_summary.csv`
-6. 读取 `2_1_best_scheme_stations.csv`
-7. 读取 `2_1_best_scheme_allocations.csv`
-8. 以 `service_satisfaction` 作为固定点迭代初值，未服务小区初值置 0
-9. 在固定布局上进入价格枚举、补贴计算和利润率校验
+- `joint_feasible_solution_exists = false`
+
+并在汇总中明确写出：
+
+“在当前预算、补贴上限和服务需求下，调价无法同时实现财务合规与公平可及，需要追加补贴、扩容或专项公益服务补贴。”
+
