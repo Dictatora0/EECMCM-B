@@ -4675,69 +4675,119 @@ $$
 
 ### 方案比较指标体系
 
-建议建立如下对比表。
+为保证问题4结果可以直接由程序输出支撑，本文将结果表统一收敛为 4 张主表。它们分别对应选址规模层、定价补贴层、敏感性分析层和鲁棒性评估层，与当前 `RQ4` 实际输出文件一一对应。
 
-#### 站点布局变化表
+#### 表1：情景化选址规模结果表
 
-| 情景 | 站点数量 | 站点位置 | 站点规模 | 总建设成本/万元 | 覆盖小区 |
-|---|---:|---|---|---:|---|
-| 基准情景 |  |  |  |  |  |
-| 老人增长率8% |  |  |  |  |  |
-| 转移概率变化 |  |  |  |  |  |
-| 固定成本+20% |  |  |  |  |  |
-| 预算140万元 |  |  |  |  |  |
+对应文件：`4_1_q2_scenario_summary.csv`
 
----
+| 字段 | 含义 |
+|---|---|
+| `scenario_code` | 情景编号，取 `S0` 至 `S4` |
+| `scenario_name` | 情景名称 |
+| `scheme_label` | 问题2方案标签，取 `coverage_priority` 或 `safety_priority` |
+| `station_count` | 建站数量 |
+| `station_locations` | 建站小区位置集合 |
+| `build_cost_wan` | 总建设成本，单位万元 |
+| `geographic_population_coverage` | 地理可达人口覆盖率 |
+| `served_population_coverage` | 实际服务人口覆盖率 |
+| `served_demand_coverage` | 实际服务需求覆盖率 |
+| `average_service_satisfaction` | 平均服务满意度 |
+| `minimum_service_satisfaction` | 最低服务满意度 |
+| `annual_net_profit_before_subsidy` | 补贴前年度净利润 |
+| `annual_net_profit_after_policy_subsidy` | 补贴后年度净利润 |
+| `capacity_safety_rate` | 容量安全率 |
+| `max_station_utilization` | 最大站点利用率 |
+| `fully_safe` | 是否全部站点均满足利用率安全阈值 |
 
-#### 综合指标比较表
-
-| 情景 | 人口覆盖率 | 需求覆盖率 | 平均满意度 | 最低满意度 | 政府补贴总额 | 年度总利润 | 利润率合规率 | 容量安全率 |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| 基准情景 |  |  |  |  |  |  |  |  |
-| 老人增长率8% |  |  |  |  |  |  |  |  |
-| 转移概率变化 |  |  |  |  |  |  |  |  |
-| 固定成本+20% |  |  |  |  |  |  |  |  |
-| 预算140万元 |  |  |  |  |  |  |  |  |
-
----
-
-#### 鲁棒性评价表
-
-| 情景 | \(RS_{loc}\) | \(RS_{cov}\) | \(RS_{sat}\) | \(RS_{fin}\) | \(RS_{cap}\) | 综合鲁棒性 \(RS\)（附录可选） |
-|---|---:|---:|---:|---:|---:|---:|
-| 老人增长率8% |  |  |  |  |  |  |
-| 转移概率变化 |  |  |  |  |  |  |
-| 固定成本+20% |  |  |  |  |  |  |
-| 预算140万元 |  |  |  |  |  |  |
+该表可直接支撑正文中的“站点布局比较表”和“综合指标比较表”。若篇幅受限，可在正文仅保留 `coverage_priority` 行，并将 `safety_priority` 行移至附录。
 
 ---
 
-#### 服务定价变化表
+#### 表2：情景化定价双方案汇总表
 
-| 情景 | 服务站 | 助餐 | 日间照料 | 上门护理 | 康复理疗 | 助浴 | 紧急救助 |
-|---|---|---:|---:|---:|---:|---:|---:|
-| 基准情景 | 站点1 |  |  |  |  |  | 0 |
-| 老人增长率8% | 站点1 |  |  |  |  |  | 0 |
-| 转移概率变化 | 站点1 |  |  |  |  |  | 0 |
-| 固定成本+20% | 站点1 |  |  |  |  |  | 0 |
-| 预算140万元 | 站点1 |  |  |  |  |  | 0 |
+对应文件：`4_1_q3_dual_scheme_summary.csv`
+
+| 字段 | 含义 |
+|---|---|
+| `scenario_code` | 情景编号，取 `S0` 至 `S4` |
+| `scenario_name` | 情景名称 |
+| `scheme_label` | 问题3方案标签，取 `financial_best` 或 `fairness_best` |
+| `price_scheme_detail` | 各站点价格方案摘要 |
+| `iteration_count` | 固定点迭代轮数 |
+| `converged` | 是否达到收敛条件 |
+| `profit_compliant` | 该方案下全部站点是否满足利润率约束 |
+| `fair_satisfaction_compliant` | 该方案下是否满足最低满意度公平约束 |
+| `feasible_station_count` | 满足利润率约束的站点数量 |
+| `average_service_satisfaction` | 平均服务满意度 |
+| `minimum_service_satisfaction` | 最低服务满意度 |
+| `vulnerable_service_satisfaction` | 半失能与失能老人加权满意度 |
+| `low_income_service_satisfaction` | 低收入小区加权满意度 |
+| `low_income_served_coverage` | 低收入小区实际服务覆盖率 |
+| `annual_government_subsidy` | 年度政府补贴总额 |
+| `annual_service_revenue` | 年度服务收入总额 |
+| `annual_direct_cost` | 年度直接支出总额 |
+| `annual_fixed_cost` | 年度固定管理成本总额 |
+| `annual_depreciation` | 年度折旧总额 |
+| `annual_net_profit_before_subsidy` | 补贴前年度净利润总额 |
+| `annual_net_profit_after_subsidy` | 补贴后年度净利润总额 |
+| `annual_net_profit` | 统一展示口径下的年度净利润 |
+
+该表是问题4中“双方案定价结果”和“公平—财务权衡”分析的核心结果表。与问题3一致，正文建议优先比较 `financial_best` 与 `fairness_best` 两类方案，而不是强行压缩为单一最优方案。
 
 ---
 
-#### 小区满意度变化表
+#### 表3：敏感性系数结果表
 
-| 小区 | 基准情景 | 老人增长率8% | 转移概率变化 | 固定成本+20% | 预算140万元 |
-|---|---:|---:|---:|---:|---:|
-| A |  |  |  |  |  |
-| B |  |  |  |  |  |
-| C |  |  |  |  |  |
-| D |  |  |  |  |  |
-| E |  |  |  |  |  |
-| F |  |  |  |  |  |
-| G |  |  |  |  |  |
-| H |  |  |  |  |  |
-| I |  |  |  |  |  |
-| J |  |  |  |  |  |
+对应文件：`4_1_sensitivity_coefficients.csv`
+
+| 字段 | 含义 |
+|---|---|
+| `scenario_code` | 扰动情景编号，取 `S1` 至 `S4` |
+| `scenario_name` | 扰动情景名称 |
+| `scheme_label` | 当前默认取 `financial_best`，用于统一比较主方案敏感性 |
+| `metric_name` | 被分析的指标名称 |
+| `baseline_value` | 基准情景下指标值 |
+| `scenario_value` | 扰动情景下指标值 |
+| `metric_relative_change` | 指标变化率 |
+| `parameter_relative_change` | 参数平均相对扰动幅度 |
+| `sensitivity_coefficient` | 敏感性系数 |
+
+当前程序已对 `served_demand_coverage`、`average_service_satisfaction`、`annual_government_subsidy` 和 `annual_net_profit_after_subsidy` 四类核心指标给出敏感性系数。若论文正文只保留一张敏感性图，建议优先基于该表作图。
+
+---
+
+#### 表4：鲁棒性评价结果表
+
+对应文件：`4_1_robustness_metrics.csv`
+
+| 字段 | 含义 |
+|---|---|
+| `scenario_code` | 扰动情景编号，取 `S1` 至 `S4` |
+| `scenario_name` | 扰动情景名称 |
+| `scheme_label` | 当前分别报告 `financial_best` 与 `fairness_best` 两类方案 |
+| `RS_loc` | 站点布局稳定性 |
+| `RS_cov` | 覆盖率稳定性 |
+| `RS_sat` | 满意度稳定性 |
+| `RS_fin` | 财务合规稳定性 |
+| `RS_cap` | 容量安全稳定性 |
+| `profit_compliant` | 该扰动情景下方案是否满足利润率约束 |
+| `fair_satisfaction_compliant` | 该扰动情景下方案是否满足公平约束 |
+| `minimum_service_satisfaction` | 最低服务满意度 |
+| `max_station_utilization` | 最大站点利用率 |
+| `capacity_safety_rate` | 容量安全率 |
+| `avg_station_profit_rate` | 站点平均利润率 |
+
+该表可直接作为正文中的“鲁棒性评价表”。若附录需要综合鲁棒性得分，可在该表基础上进一步计算 \(RS\)，但不建议正文只保留单一综合分数。
+
+---
+
+#### 附录可选派生表
+
+若论文篇幅允许，可进一步由缓存结果或问题3明细结果派生以下附录表，但它们不属于当前 `RQ4` 默认主输出文件：
+
+- 情景化服务定价明细表：按站点展开各服务价格，可由 `4_1_q3_dual_scheme_summary.csv` 结合问题3站点级结果继续拆分生成；
+- 小区满意度变化表：按小区展开不同情景下的满意度变化，可由缓存结果按需重建。
 
 ---
 

@@ -1,0 +1,17 @@
+﻿scenario_code,scenario_name,scheme_label,metric_name,baseline_value,scenario_value,metric_relative_change,parameter_relative_change,sensitivity_coefficient
+S1,老人增长率提高,financial_best,served_demand_coverage,0.847617,0.815468,-0.037929,0.028571,-1.327504
+S1,老人增长率提高,financial_best,average_service_satisfaction,0.545572,0.656382,0.203108,0.028571,7.108778
+S1,老人增长率提高,financial_best,annual_government_subsidy,1959698.67,2409000.0,0.229271,0.028571,8.024472
+S1,老人增长率提高,financial_best,annual_net_profit_after_subsidy,830408.42,698131.01,-0.159292,0.028571,-5.57522
+S2,转移概率变化,financial_best,served_demand_coverage,0.847617,0.834163,-0.015873,0.054444,-0.29154
+S2,转移概率变化,financial_best,average_service_satisfaction,0.545572,0.595449,0.091421,0.054444,1.67917
+S2,转移概率变化,financial_best,annual_government_subsidy,1959698.67,2016585.07,0.029028,0.054444,0.53317
+S2,转移概率变化,financial_best,annual_net_profit_after_subsidy,830408.42,478433.52,-0.423858,0.054444,-7.785139
+S3,固定成本上升,financial_best,served_demand_coverage,0.847617,0.847617,0.0,0.04,0.0
+S3,固定成本上升,financial_best,average_service_satisfaction,0.545572,0.672513,0.232675,0.04,5.816877
+S3,固定成本上升,financial_best,annual_government_subsidy,1959698.67,2303435.56,0.175403,0.04,4.385073
+S3,固定成本上升,financial_best,annual_net_profit_after_subsidy,830408.42,-488437.3,-1.588189,0.04,-39.704731
+S4,预算提高,financial_best,served_demand_coverage,0.847617,0.847617,0.0,0.033333,0.0
+S4,预算提高,financial_best,average_service_satisfaction,0.545572,0.545572,0.0,0.033333,0.0
+S4,预算提高,financial_best,annual_government_subsidy,1959698.67,1959698.67,0.0,0.033333,0.0
+S4,预算提高,financial_best,annual_net_profit_after_subsidy,830408.42,830408.42,0.0,0.033333,0.0

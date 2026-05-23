@@ -1,0 +1,68 @@
+{
+  "scenario_code": "S1",
+  "scenario_name": "老人增长率提高",
+  "q2_best_summary": {
+    "scheme_code": "1000103011",
+    "scheme_detail": "A-小型;E-小型;G-大型;I-小型;J-小型",
+    "station_count": 5,
+    "build_cost_wan": 117.0,
+    "geographic_population_coverage": 1.0,
+    "served_population_coverage": 1.0,
+    "served_demand_coverage": 0.815468,
+    "average_service_satisfaction": 0.842815,
+    "minimum_service_satisfaction": 0.743738,
+    "total_raw_served_demand_daily": 7000.0,
+    "total_effective_person_times_daily": 6032.2942,
+    "capacity_safety_rate": 0.0,
+    "max_station_utilization": 1.0,
+    "fully_safe": 0,
+    "fully_served_community_count": 6,
+    "total_unmet_daily_demand": 1584.0313,
+    "utilization_variance": 0.0,
+    "annual_net_profit_before_subsidy": -2587275.69,
+    "annual_net_profit_after_policy_subsidy": -178275.69
+  },
+  "q2_safe_summary": {
+    "scheme_code": "0000030030",
+    "scheme_detail": "F-大型;I-大型",
+    "station_count": 2,
+    "build_cost_wan": 90.0,
+    "geographic_population_coverage": 0.89627,
+    "served_population_coverage": 0.550117,
+    "served_demand_coverage": 0.557563,
+    "average_service_satisfaction": 0.855052,
+    "minimum_service_satisfaction": 0.83,
+    "total_raw_served_demand_daily": 4786.1359,
+    "total_effective_person_times_daily": 4090.2925,
+    "capacity_safety_rate": 0.5,
+    "max_station_utilization": 1.0,
+    "fully_safe": 0,
+    "fully_served_community_count": 5,
+    "total_unmet_daily_demand": 3797.8954,
+    "utilization_variance": 0.04093,
+    "annual_net_profit_before_subsidy": -2107117.0,
+    "annual_net_profit_after_policy_subsidy": -209117.0
+  },
+  "q2_best_station_locations": [
+    "A",
+    "E",
+    "G",
+    "I",
+    "J"
+  ],
+  "q2_safe_station_locations": [
+    "F",
+    "I"
+  ],
+  "q2_best_station_utilizations": [
+    1.0,
+    0.9999999999999999,
+    1.0,
+    1.0000000000000002,
+    1.0
+  ],
+  "q2_safe_station_utilizations": [
+    0.5953786483916319,
+    1.0
+  ]
+}
