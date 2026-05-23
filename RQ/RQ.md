@@ -3810,43 +3810,123 @@ $$
 
 ### 问题3结果输出表设计
 
-后续集中求解时，问题3建议输出以下表格。
+后续集中求解时，问题3建议直接输出与代码文件一一对应的 6 张结果表。这样论文表格、作图数据和程序输出可以完全对齐，避免后期人工转写造成口径漂移。
 
-#### 表1：各服务站最优定价表
+#### 表1：最优定价方案汇总表
 
-| 服务站 | 规模 | 助餐 | 日间照料 | 上门护理 | 康复理疗 | 助浴 | 紧急救助 |
-|---|---|---:|---:|---:|---:|---:|---:|
-| 站点1 | 小/中/大 |  |  |  |  |  | 0 |
-| 站点2 | 小/中/大 |  |  |  |  |  | 0 |
+对应文件：`3_1_best_price_scheme_summary.csv`
+
+| 字段 | 含义 |
+|---|---|
+| `price_scheme_detail` | 各站点最优价格方案摘要，当前用“站点:助餐价格/日间照料价格”展示统一价档 |
+| `iteration_count` | 固定点迭代收敛所需轮数 |
+| `converged` | 是否达到收敛条件 |
+| `profit_compliant` | 全部站点是否满足 \(0\le \rho_j\le 0.08\) |
+| `fair_satisfaction_compliant` | 已服务小区最低满意度是否满足公平约束 |
+| `feasible_station_count` | 满足利润率约束的站点数量 |
+| `average_service_satisfaction` | 全部已服务小区平均满意度 |
+| `minimum_service_satisfaction` | 已服务小区中的最低满意度 |
+| `vulnerable_service_satisfaction` | 半失能与失能老人加权满意度 |
+| `low_income_service_satisfaction` | 低收入小区老人加权满意度 |
+| `low_income_served_coverage` | 低收入小区老人实际服务覆盖率 |
+| `annual_government_subsidy` | 全部站点年度政府补贴总额 |
+| `annual_service_revenue` | 全部站点年度服务收入总额 |
+| `annual_direct_cost` | 全部站点年度直接支出总额 |
+| `annual_fixed_cost` | 全部站点年度固定管理成本总额 |
+| `annual_depreciation` | 全部站点年度折旧总额 |
+| `annual_net_profit_before_subsidy` | 补贴前年度净利润总额 |
+| `annual_net_profit_after_subsidy` | 补贴后年度净利润总额 |
+| `annual_net_profit` | 当前与补贴后净利润一致，作为统一展示口径保留 |
+
+其中，低收入小区可统一定义为“人均月收入低于 10 个小区收入中位数”的小区集合，以保证定义客观稳定。
 
 ---
 
-#### 表2：各服务站年度利润、利润率与公益服务成本缺口
+#### 表2：各服务站年度收支、利润率与公益服务成本缺口表
 
-| 服务站 | 年度收入 | 政府补贴 | 年度直接支出 | 固定管理成本 | 折旧成本 | 年度利润 | 利润率 | 公益服务成本缺口 |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| 站点1 |  |  |  |  |  |  |  |
-| 站点2 |  |  |  |  |  |  |  |
+对应文件：`3_1_best_price_scheme_stations.csv`
+
+| 字段 | 含义 |
+|---|---|
+| `station_community` | 服务站所在小区 |
+| `scale` | 服务站规模 |
+| `raw_served_demand_daily` | 站点承接的原始日服务量 |
+| `effective_person_times_daily` | 站点满意度折减后的有效日服务量 |
+| `annual_service_revenue` | 年度服务收入 |
+| `annual_direct_cost` | 年度直接支出 |
+| `annual_fixed_cost` | 年度固定管理成本 |
+| `annual_depreciation` | 年度折旧成本 |
+| `annual_government_subsidy` | 年度政府补贴 |
+| `annual_net_profit_before_subsidy` | 补贴前年度净利润 |
+| `annual_net_profit_after_subsidy` | 补贴后年度净利润 |
+| `annual_net_profit` | 当前与补贴后净利润一致，便于统一调用 |
+| `profit_rate` | 补贴后利润率 |
+| `profit_compliant` | 该站点是否满足 \(0\le \rho_j\le 0.08\) |
+| `emergency_public_loss` | 紧急救助免费服务形成的公益服务成本缺口 |
+
+该表对应论文中的“各服务站年度利润、利润率与公益服务成本缺口”主表，建议正文直接引用。
 
 ---
 
-#### 表3：各小区满意度得分
+#### 表3：各小区主站分配、协同分流与满意度表
 
-| 小区 | 主承接站/候选站 | 距离满意度S1 | 响应满意度S2 | 价格满意度S3 | 综合满意度S |
-|---|---|---:|---:|---:|---:|
-| A |  |  |  |  |  |
-| B |  |  |  |  |  |
+对应文件：`3_1_best_price_scheme_communities.csv`
+
+| 字段 | 含义 |
+|---|---|
+| `community` | 小区名称 |
+| `primary_station` | 价格调整后重新判定的主服务站 |
+| `overflow_station` | 次优协同站点；无则留空 |
+| `primary_load_daily` | 由主服务站承接的日服务量 |
+| `overflow_load_daily` | 由次优站分流承接的日服务量 |
+| `unmet_load_daily` | 容量不足下未满足的日服务量 |
+| `raw_served_demand_daily` | 实际承接的原始日服务量 |
+| `effective_person_times_daily` | 满意度折减后的有效日服务量 |
+| `service_satisfaction` | 小区综合服务满意度 |
+| `served` | 是否获得实际服务 |
+| `price_satisfaction` | 需求结构加权后的价格满意度 |
+
+该表对应论文中的“小区主承接站/候选站、价格满意度与综合满意度”主表。若需要分解 \(S_1,S_2,S_3\)，可在附录中另行展开。
 
 ---
 
-#### 表4：不同类型与低收入群体服务可及性分析
+#### 表4：固定点迭代收敛过程表
 
-| 群体 | 经济可及性 | 地理可及性 | 服务可及性 | 主要影响因素 |
-|---|---|---|---|---|
-| 自理老人 | 高 | 较高 | 高 | 消费上限较宽松，主要受距离影响 |
-| 半失能老人 | 中 | 中 | 中 | 服务频次较高，价格和距离均有影响 |
-| 失能老人 | 较低 | 较低 | 较低 | 服务需求高，对上门护理、助浴、康复服务依赖强 |
-| 低收入小区老人 | 较低 | 视站点布局而定 | 中低 | 收入约束更强，对补贴和价格更敏感 |
+对应文件：`3_1_best_price_scheme_iteration_trace.csv`
+
+| 字段 | 含义 |
+|---|---|
+| `iteration` | 迭代轮次 |
+| `max_satisfaction_delta` | 本轮与上一轮的最大满意度变化量 |
+| `average_service_satisfaction` | 本轮平均服务满意度 |
+| `feasible_station_count` | 本轮满足利润率约束的站点数 |
+| `total_subsidy` | 本轮年度政府补贴总额 |
+
+该表既可用于附录中的“固定点迭代收敛图”，也可作为算法闭合性的直接证据。
+
+---
+
+#### 表5：不同类型与低收入群体服务可及性分析表
+
+对应文件：`3_1_best_price_scheme_accessibility_groups.csv`
+
+| 字段 | 含义 |
+|---|---|
+| `group` | 群体类别：自理、半失能、失能、低收入小区 |
+| `economic_accessibility` | 经济可及性定性评价 |
+| `geographic_accessibility` | 地理可及性定性评价 |
+| `service_accessibility` | 群体加权服务可及性或满意度指标 |
+| `key_factor` | 主要影响因素解释 |
+
+其中，`service_accessibility` 建议作为正文图表和政策解释的核心数值；其余三列负责支持定性讨论。
+
+---
+
+#### 表6：候选价格方案排序表
+
+对应文件：`3_1_top_price_schemes.csv`
+
+该表字段与表1一致，用于展示前若干候选价格方案在“利润率合规、脆弱群体满意度、总体满意度、补贴规模”之间的权衡关系。正文可仅展示前 3 至 5 个方案，完整排序表放入附录。
 
 ---
 

@@ -653,6 +653,15 @@ def recommended_price_candidates() -> Dict[str, List[float]]:
     return result
 
 
+def write_csv(path: Path, rows: List[Dict[str, object]]) -> None:
+    if not rows:
+        return
+    with path.open("w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(rows)
+
+
 def validate_adjusted_demand_summary(records: List[AdjustedDemandSummaryRecord]) -> None:
     by_community: Dict[str, set[str]] = {}
     for record in records:

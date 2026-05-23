@@ -88,14 +88,14 @@ def test_select_safe_scheme_respects_higher_threshold() -> None:
     assert threshold == 0.75
 
 
-def test_primary_station_prefers_capacity_feasible_choice() -> None:
+def test_primary_station_always_prefers_highest_satisfaction_choice() -> None:
     reachable = [
         ("B", 300.0, 1.0, 0.99),
         ("A", 400.0, 0.9, 0.97),
     ]
     remaining = {"A": 800.0, "B": 100.0}
     selected = choose_primary_station(reachable, remaining, total_daily_demand=700.0, emergency_daily_demand=50.0)
-    assert selected == "A"
+    assert selected == "B"
 
 
 def test_overflow_station_skips_primary_and_zero_capacity_station() -> None:
@@ -118,7 +118,7 @@ def run_all_tests() -> None:
         test_safe_sorting_prefers_capacity_safety,
         test_select_safe_scheme_uses_threshold_then_fallback,
         test_select_safe_scheme_respects_higher_threshold,
-        test_primary_station_prefers_capacity_feasible_choice,
+        test_primary_station_always_prefers_highest_satisfaction_choice,
         test_overflow_station_skips_primary_and_zero_capacity_station,
     ]
     for test in tests:

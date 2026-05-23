@@ -725,17 +725,8 @@ def choose_primary_station(
     total_daily_demand: float,
     emergency_daily_demand: float,
 ) -> str:
-    ranked = sorted(
-        reachable,
-        key=lambda item: (
-            remaining_capacity[item[0]] >= emergency_daily_demand - 1e-12,
-            min(remaining_capacity[item[0]], total_daily_demand),
-            item[3],
-            -item[1],
-        ),
-        reverse=True,
-    )
-    return ranked[0][0]
+    del remaining_capacity, total_daily_demand, emergency_daily_demand
+    return reachable[0][0]
 
 
 def choose_overflow_station(
