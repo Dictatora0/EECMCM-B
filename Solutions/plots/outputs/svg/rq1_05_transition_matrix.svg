@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="481.253188pt" height="340.055469pt" viewBox="0 0 481.253188 340.055469" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2026-05-24T20:14:34.417420</dc:date>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.10.9, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 340.055469 
+L 481.253188 340.055469 
+L 481.253188 0 
+L 0 0 
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 38.092344 301.963125 
+L 404.140344 301.963125 
+L 404.140344 24.763125 
+L 38.092344 24.763125 
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="QuadMesh_1">
+    <path d="M 38.092344 24.763125 
+L 160.108344 24.763125 
+L 160.108344 117.163125 
+L 38.092344 117.163125 
+L 38.092344 24.763125 
+" clip-path="url(#p7c4b337faa)" style="fill: #081d58; stroke: #ffffff; stroke-width: 0.5"/>
+    <path d="M 160.108344 24.763125 
+L 282.124344 24.763125 
+L 282.124344 117.163125 
+L 160.108344 117.163125 
+L 160.108344 24.763125 
+" clip-path="url(#p7c4b337faa)" style="fill: #f5fbc2; stroke: #ffffff; stroke-width: 0.5"/>
+    <path d="M 282.124344 24.763125 
+L 404.140344 24.763125 
+L 404.140344 117.163125 
+L 282.124344 117.163125 
+L 282.124344 24.763125 
+" clip-path="url(#p7c4b337faa)" style="fill: #f5fbc2; stroke: #ffffff; stroke-width: 0.5"/>
+    <path d="M 38.092344 117.163125 
+L 160.108344 117.163125 
+L 160.108344 209.563125 
+L 38.092344 209.563125 
+L 38.092344 117.163125 
+" clip-path="url(#p7c4b337faa)" style="fill: #f9fdcb; stroke: #ffffff; stroke-width: 0.5"/>
+    <path d="M 160.108344 117.163125 
+L 282.124344 117.163125 
+L 282.124344 209.563125 
+L 160.108344 209.563125 
+L 160.108344 117.163125 
+" clip-path="url(#p7c4b337faa)" style="fill: #253494; stroke: #ffffff; stroke-width: 0.5"/>
+    <path d="M 282.124344 117.163125 
+L 404.140344 117.163125 
+L 404.140344 209.563125 
+L 282.124344 209.563125 
+L 282.124344 117.163125 
+" clip-path="url(#p7c4b337faa)" style="fill: #ffffd9; stroke: #ffffff; stroke-width: 0.5"/>
+    <path d="M 38.092344 209.563125 
+L 160.108344 209.563125 
+L 160.108344 301.963125 
+L 38.092344 301.963125 
+L 38.092344 209.563125 
+" clip-path="url(#p7c4b337faa)" style="fill: #ffffd9; stroke: #ffffff; stroke-width: 0.5"/>
+    <path d="M 160.108344 209.563125 
+L 282.124344 209.563125 
+L 282.124344 301.963125 
+L 160.108344 301.963125 
+L 160.108344 209.563125 
+" clip-path="url(#p7c4b337faa)" style="fill: #f1fabb; stroke: #ffffff; stroke-width: 0.5"/>
+    <path d="M 282.124344 209.563125 
+L 404.140344 209.563125 
+L 404.140344 301.963125 
+L 282.124344 301.963125 
+L 282.124344 209.563125 
+" clip-path="url(#p7c4b337faa)" style="fill: #0e2265; stroke: #ffffff; stroke-width: 0.5"/>
+   </g>
+   <g id="matplotlib.axis_1">
+    <g id="xtick_1">
+     <g id="line2d_1">
+      <path d="M 99.100344 301.963125 
+L 99.100344 24.763125 
+" clip-path="url(#p7c4b337faa)" style="fill: none; stroke-dasharray: 2.22,0.96; stroke-dashoffset: 0; stroke: #b8c2cc; stroke-opacity: 0.28; stroke-width: 0.6"/>
+     </g>
+     <g id="line2d_2">
+      <defs>
+       <path id="ma2aadddbf5" d="M 0 0 
+L 0 3.5 
+" style="stroke: #000000; stroke-width: 0.8"/>
+      </defs>
+      <g>
+       <use xlink:href="#ma2aadddbf5" x="99.100344" y="301.963125" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_1">
+      <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle" x="99.100344" y="316.961563" transform="rotate(-0 99.100344 316.961563)">本期自理</text>
+     </g>
+    </g>
+    <g id="xtick_2">
+     <g id="line2d_3">
+      <path d="M 221.116344 301.963125 
+L 221.116344 24.763125 
+" clip-path="url(#p7c4b337faa)" style="fill: none; stroke-dasharray: 2.22,0.96; stroke-dashoffset: 0; stroke: #b8c2cc; stroke-opacity: 0.28; stroke-width: 0.6"/>
+     </g>
+     <g id="line2d_4">
+      <g>
+       <use xlink:href="#ma2aadddbf5" x="221.116344" y="301.963125" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_2">
+      <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle" x="221.116344" y="317.081875" transform="rotate(-0 221.116344 317.081875)">本期半失能</text>
+     </g>
+    </g>
+    <g id="xtick_3">
+     <g id="line2d_5">
+      <path d="M 343.132344 301.963125 
+L 343.132344 24.763125 
+" clip-path="url(#p7c4b337faa)" style="fill: none; stroke-dasharray: 2.22,0.96; stroke-dashoffset: 0; stroke: #b8c2cc; stroke-opacity: 0.28; stroke-width: 0.6"/>
+     </g>
+     <g id="line2d_6">
+      <g>
+       <use xlink:href="#ma2aadddbf5" x="343.132344" y="301.963125" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_3">
+      <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle" x="343.132344" y="316.961563" transform="rotate(-0 343.132344 316.961563)">本期失能</text>
+     </g>
+    </g>
+    <g id="text_4">
+     <text style="font-size: 11px; font-family: 'Songti SC'; text-anchor: middle" x="221.116344" y="331.325781" transform="rotate(-0 221.116344 331.325781)">本期状态</text>
+    </g>
+   </g>
+   <g id="matplotlib.axis_2">
+    <g id="ytick_1">
+     <g id="line2d_7">
+      <path d="M 38.092344 70.963125 
+L 404.140344 70.963125 
+" clip-path="url(#p7c4b337faa)" style="fill: none; stroke-dasharray: 2.22,0.96; stroke-dashoffset: 0; stroke: #b8c2cc; stroke-opacity: 0.28; stroke-width: 0.6"/>
+     </g>
+     <g id="line2d_8">
+      <defs>
+       <path id="m99287739af" d="M 0 0 
+L -3.5 0 
+" style="stroke: #000000; stroke-width: 0.8"/>
+      </defs>
+      <g>
+       <use xlink:href="#m99287739af" x="38.092344" y="70.963125" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_5">
+      <text style="font-size: 10px; font-family: 'Songti SC'" transform="translate(29.701719 95.963125) rotate(-90)">下一期自理</text>
+     </g>
+    </g>
+    <g id="ytick_2">
+     <g id="line2d_9">
+      <path d="M 38.092344 163.363125 
+L 404.140344 163.363125 
+" clip-path="url(#p7c4b337faa)" style="fill: none; stroke-dasharray: 2.22,0.96; stroke-dashoffset: 0; stroke: #b8c2cc; stroke-opacity: 0.28; stroke-width: 0.6"/>
+     </g>
+     <g id="line2d_10">
+      <g>
+       <use xlink:href="#m99287739af" x="38.092344" y="163.363125" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_6">
+      <text style="font-size: 10px; font-family: 'Songti SC'" transform="translate(29.701719 193.363125) rotate(-90)">下一期半失能</text>
+     </g>
+    </g>
+    <g id="ytick_3">
+     <g id="line2d_11">
+      <path d="M 38.092344 255.763125 
+L 404.140344 255.763125 
+" clip-path="url(#p7c4b337faa)" style="fill: none; stroke-dasharray: 2.22,0.96; stroke-dashoffset: 0; stroke: #b8c2cc; stroke-opacity: 0.28; stroke-width: 0.6"/>
+     </g>
+     <g id="line2d_12">
+      <g>
+       <use xlink:href="#m99287739af" x="38.092344" y="255.763125" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_7">
+      <text style="font-size: 10px; font-family: 'Songti SC'" transform="translate(29.701719 280.763125) rotate(-90)">下一期失能</text>
+     </g>
+    </g>
+    <g id="text_8">
+     <text style="font-size: 11px; font-family: 'Songti SC'; text-anchor: middle" x="16.053281" y="163.363125" transform="rotate(-90 16.053281 163.363125)">下一期状态</text>
+    </g>
+   </g>
+   <g id="text_9">
+    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #ffffff" x="99.100344" y="73.867813" transform="rotate(-0 99.100344 73.867813)">0.977</text>
+   </g>
+   <g id="text_10">
+    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #262626" x="221.116344" y="73.867813" transform="rotate(-0 221.116344 73.867813)">0.070</text>
+   </g>
+   <g id="text_11">
+    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #262626" x="343.132344" y="73.867813" transform="rotate(-0 343.132344 73.867813)">0.070</text>
+   </g>
+   <g id="text_12">
+    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #262626" x="99.100344" y="166.267813" transform="rotate(-0 99.100344 166.267813)">0.043</text>
+   </g>
+   <g id="text_13">
+    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #ffffff" x="221.116344" y="166.267813" transform="rotate(-0 221.116344 166.267813)">0.855</text>
+   </g>
+   <g id="text_14">
+    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #262626" x="343.132344" y="166.267813" transform="rotate(-0 343.132344 166.267813)">0.000</text>
+   </g>
+   <g id="text_15">
+    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #262626" x="99.100344" y="258.667812" transform="rotate(-0 99.100344 258.667812)">0.000</text>
+   </g>
+   <g id="text_16">
+    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #262626" x="221.116344" y="258.667812" transform="rotate(-0 221.116344 258.667812)">0.095</text>
+   </g>
+   <g id="text_17">
+    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #ffffff" x="343.132344" y="258.667812" transform="rotate(-0 343.132344 258.667812)">0.950</text>
+   </g>
+   <g id="text_18">
+    <text style="font-size: 14px; font-family: 'Songti SC'; text-anchor: middle" x="221.116344" y="18.763125" transform="rotate(-0 221.116344 18.763125)">老年状态转移矩阵热力图</text>
+   </g>
+  </g>
+  <g id="axes_2">
+   <g id="patch_3">
+    <path d="M 427.018344 301.963125 
+L 440.878344 301.963125 
+L 440.878344 24.763125 
+L 427.018344 24.763125 
+z
+" style="fill: #ffffff"/>
+   </g>
+   <image xlink:href="data:image/png;base64,
+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" id="image72b98d6fbe" transform="scale(1 -1) translate(0 -277.2)" x="427.05" y="-24.75" width="13.725" height="277.2"/>
+   <g id="matplotlib.axis_3"/>
+   <g id="matplotlib.axis_4">
+    <g id="ytick_4">
+     <g id="line2d_13">
+      <defs>
+       <path id="m106184f9c1" d="M 0 0 
+L 3.5 0 
+" style="stroke: #000000; stroke-width: 0.8"/>
+      </defs>
+      <g>
+       <use xlink:href="#m106184f9c1" x="440.878344" y="301.963125" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_19">
+      <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: start" x="447.878344" y="305.563125" transform="rotate(-0 447.878344 305.563125)">0.0</text>
+     </g>
+    </g>
+    <g id="ytick_5">
+     <g id="line2d_14">
+      <g>
+       <use xlink:href="#m106184f9c1" x="440.878344" y="245.232503" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_20">
+      <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: start" x="447.878344" y="248.832503" transform="rotate(-0 447.878344 248.832503)">0.2</text>
+     </g>
+    </g>
+    <g id="ytick_6">
+     <g id="line2d_15">
+      <g>
+       <use xlink:href="#m106184f9c1" x="440.878344" y="188.501882" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_21">
+      <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: start" x="447.878344" y="192.101882" transform="rotate(-0 447.878344 192.101882)">0.4</text>
+     </g>
+    </g>
+    <g id="ytick_7">
+     <g id="line2d_16">
+      <g>
+       <use xlink:href="#m106184f9c1" x="440.878344" y="131.77126" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_22">
+      <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: start" x="447.878344" y="135.37126" transform="rotate(-0 447.878344 135.37126)">0.6</text>
+     </g>
+    </g>
+    <g id="ytick_8">
+     <g id="line2d_17">
+      <g>
+       <use xlink:href="#m106184f9c1" x="440.878344" y="75.040638" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_23">
+      <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: start" x="447.878344" y="78.640638" transform="rotate(-0 447.878344 78.640638)">0.8</text>
+     </g>
+    </g>
+    <g id="text_24">
+     <text style="font-size: 11px; font-family: 'Songti SC'; text-anchor: middle" x="472.5235" y="163.363125" transform="rotate(-90 472.5235 163.363125)">转移概率</text>
+    </g>
+   </g>
+   <g id="LineCollection_1"/>
+   <g id="patch_4">
+    <path d="M 427.018344 301.963125 
+L 433.948344 301.963125 
+L 440.878344 301.963125 
+L 440.878344 24.763125 
+L 433.948344 24.763125 
+L 427.018344 24.763125 
+L 427.018344 301.963125 
+z
+" style="fill: none"/>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="p7c4b337faa">
+   <rect x="38.092344" y="24.763125" width="366.048" height="277.2"/>
+  </clipPath>
+ </defs>
+</svg>

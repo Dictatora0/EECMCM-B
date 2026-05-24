@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="553.215312pt" height="378.815313pt" viewBox="0 0 553.215312 378.815313" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2026-05-24T20:14:35.476467</dc:date>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.10.9, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 378.815313 
+L 553.215312 378.815313 
+L 553.215312 0 
+L 0 0 
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 21.495313 357.32 
+L 546.015313 357.32 
+L 546.015313 24.68 
+L 21.495313 24.68 
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="patch_3">
+    <path d="M 65.460637 342.2 
+C 65.49494 342.2 65.527844 342.19573 65.5521 342.188131 
+C 65.576356 342.180532 65.589985 342.170224 65.589985 342.159478 
+C 65.589985 342.148731 65.576356 342.138423 65.5521 342.130824 
+C 65.527844 342.123225 65.49494 342.118955 65.460637 342.118955 
+C 65.426333 342.118955 65.39343 342.123225 65.369174 342.130824 
+C 65.344917 342.138423 65.331289 342.148731 65.331289 342.159478 
+C 65.331289 342.170224 65.344917 342.180532 65.369174 342.188131 
+C 65.39343 342.19573 65.426333 342.2 65.460637 342.2 
+L 65.460637 342.2 
+z
+" clip-path="url(#pab40d49b1e)" style="fill: none; opacity: 0.8; stroke-dasharray: 3.7,1.6; stroke-dashoffset: 0; stroke: #c08a5a; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 45.466479 125.351272 
+C 45.500783 125.351272 45.533686 125.347003 45.557942 125.339404 
+C 45.582198 125.331805 45.595827 125.321497 45.595827 125.31075 
+C 45.595827 125.300003 45.582198 125.289695 45.557942 125.282096 
+C 45.533686 125.274497 45.500783 125.270228 45.466479 125.270228 
+C 45.432175 125.270228 45.399272 125.274497 45.375016 125.282096 
+C 45.35076 125.289695 45.337131 125.300003 45.337131 125.31075 
+C 45.337131 125.321497 45.35076 125.331805 45.375016 125.339404 
+C 45.399272 125.347003 45.432175 125.351272 45.466479 125.351272 
+L 45.466479 125.351272 
+z
+" clip-path="url(#pab40d49b1e)" style="fill: none; opacity: 0.8; stroke-dasharray: 3.7,1.6; stroke-dashoffset: 0; stroke: #c08a5a; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 277.058153 71.349156 
+C 277.092457 71.349156 277.12536 71.344886 277.149616 71.337287 
+C 277.173873 71.329688 277.187502 71.31938 277.187502 71.308633 
+C 277.187502 71.297887 277.173873 71.287579 277.149616 71.27998 
+C 277.12536 71.272381 277.092457 71.268111 277.058153 71.268111 
+C 277.02385 71.268111 276.990947 71.272381 276.96669 71.27998 
+C 276.942434 71.287579 276.928805 71.297887 276.928805 71.308633 
+C 276.928805 71.31938 276.942434 71.329688 276.96669 71.337287 
+C 276.990947 71.344886 277.02385 71.349156 277.058153 71.349156 
+L 277.058153 71.349156 
+z
+" clip-path="url(#pab40d49b1e)" style="fill: none; opacity: 0.8; stroke-dasharray: 3.7,1.6; stroke-dashoffset: 0; stroke: #c08a5a; stroke-linejoin: miter"/>
+   </g>
+   <g id="matplotlib.axis_1">
+    <g id="text_1">
+     <text style="font-size: 11px; font-family: 'Songti SC'; text-anchor: middle" x="283.755313" y="370.085625" transform="rotate(-0 283.755313 370.085625)">拓扑坐标 X</text>
+    </g>
+   </g>
+   <g id="matplotlib.axis_2">
+    <g id="text_2">
+     <text style="font-size: 11px; font-family: 'Songti SC'; text-anchor: middle" x="15.965625" y="191" transform="rotate(-90 15.965625 191)">拓扑坐标 Y</text>
+    </g>
+   </g>
+   <g id="PathCollection_1">
+    <defs>
+     <path id="m4c71a101ae" d="M 0 5.477226 
+C 1.452577 5.477226 2.845856 4.900111 3.872983 3.872983 
+C 4.900111 2.845856 5.477226 1.452577 5.477226 0 
+C 5.477226 -1.452577 4.900111 -2.845856 3.872983 -3.872983 
+C 2.845856 -4.900111 1.452577 -5.477226 0 -5.477226 
+C -1.452577 -5.477226 -2.845856 -4.900111 -3.872983 -3.872983 
+C -4.900111 -2.845856 -5.477226 -1.452577 -5.477226 0 
+C -5.477226 1.452577 -4.900111 2.845856 -3.872983 3.872983 
+C -2.845856 4.900111 -1.452577 5.477226 0 5.477226 
+z
+" style="stroke: #6b7280; stroke-width: 0.8"/>
+    </defs>
+    <g clip-path="url(#pab40d49b1e)">
+     <use xlink:href="#m4c71a101ae" x="65.460637" y="342.159478" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
+     <use xlink:href="#m4c71a101ae" x="133.004243" y="263.458089" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
+     <use xlink:href="#m4c71a101ae" x="45.466479" y="125.31075" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
+     <use xlink:href="#m4c71a101ae" x="417.140873" y="223.614955" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
+     <use xlink:href="#m4c71a101ae" x="277.058153" y="71.308633" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
+     <use xlink:href="#m4c71a101ae" x="522.173494" y="39.8" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
+     <use xlink:href="#m4c71a101ae" x="371.23952" y="116.593599" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
+     <use xlink:href="#m4c71a101ae" x="362.505411" y="261.95975" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
+     <use xlink:href="#m4c71a101ae" x="336.805115" y="159.333933" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
+     <use xlink:href="#m4c71a101ae" x="220.19679" y="228.455127" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
+    </g>
+   </g>
+   <g id="patch_6">
+    <path d="M 21.495313 357.32 
+L 21.495313 24.68 
+" style="fill: none; stroke: #555555; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_7">
+    <path d="M 546.015313 357.32 
+L 546.015313 24.68 
+" style="fill: none; stroke: #555555; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_8">
+    <path d="M 21.495313 357.32 
+L 546.015313 357.32 
+" style="fill: none; stroke: #555555; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_9">
+    <path d="M 21.495313 24.68 
+L 546.015313 24.68 
+" style="fill: none; stroke: #555555; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="text_3">
+    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #111827" x="133.004243" y="266.362777" transform="rotate(-0 133.004243 266.362777)">B</text>
+   </g>
+   <g id="text_4">
+    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #111827" x="417.140873" y="226.519643" transform="rotate(-0 417.140873 226.519643)">D</text>
+   </g>
+   <g id="text_5">
+    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #111827" x="522.173494" y="42.704687" transform="rotate(-0 522.173494 42.704687)">F</text>
+   </g>
+   <g id="text_6">
+    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #111827" x="371.23952" y="119.498287" transform="rotate(-0 371.23952 119.498287)">G</text>
+   </g>
+   <g id="text_7">
+    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #111827" x="362.505411" y="264.864437" transform="rotate(-0 362.505411 264.864437)">H</text>
+   </g>
+   <g id="text_8">
+    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #111827" x="336.805115" y="162.238621" transform="rotate(-0 336.805115 162.238621)">I</text>
+   </g>
+   <g id="text_9">
+    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #111827" x="220.19679" y="231.350439" transform="rotate(-0 220.19679 231.350439)">J</text>
+   </g>
+   <g id="text_10">
+    <text style="font-size: 14px; font-family: 'Songti SC'; text-anchor: middle" x="283.755313" y="18.68" transform="rotate(-0 283.755313 18.68)">服务站拓扑布局与覆盖关系图</text>
+   </g>
+   <g id="PathCollection_2">
+    <defs>
+     <path id="m15269acde9" d="M 0 10.246951 
+C 2.717523 10.246951 5.324109 9.167267 7.245688 7.245688 
+C 9.167267 5.324109 10.246951 2.717523 10.246951 0 
+C 10.246951 -2.717523 9.167267 -5.324109 7.245688 -7.245688 
+C 5.324109 -9.167267 2.717523 -10.246951 0 -10.246951 
+C -2.717523 -10.246951 -5.324109 -9.167267 -7.245688 -7.245688 
+C -9.167267 -5.324109 -10.246951 -2.717523 -10.246951 0 
+C -10.246951 2.717523 -9.167267 5.324109 -7.245688 7.245688 
+C -5.324109 9.167267 -2.717523 10.246951 0 10.246951 
+z
+" style="stroke: #374151"/>
+    </defs>
+    <g clip-path="url(#pab40d49b1e)">
+     <use xlink:href="#m15269acde9" x="65.460637" y="342.159478" style="fill: #5b7c99; stroke: #374151"/>
+    </g>
+   </g>
+   <g id="PathCollection_3">
+    <defs>
+     <path id="mceb139a73d" d="M 0 7.416198 
+C 1.966799 7.416198 3.853307 6.634781 5.244044 5.244044 
+C 6.634781 3.853307 7.416198 1.966799 7.416198 0 
+C 7.416198 -1.966799 6.634781 -3.853307 5.244044 -5.244044 
+C 3.853307 -6.634781 1.966799 -7.416198 0 -7.416198 
+C -1.966799 -7.416198 -3.853307 -6.634781 -5.244044 -5.244044 
+C -6.634781 -3.853307 -7.416198 -1.966799 -7.416198 0 
+C -7.416198 1.966799 -6.634781 3.853307 -5.244044 5.244044 
+C -3.853307 6.634781 -1.966799 7.416198 0 7.416198 
+z
+" style="stroke: #374151"/>
+    </defs>
+    <g clip-path="url(#pab40d49b1e)">
+     <use xlink:href="#mceb139a73d" x="45.466479" y="125.31075" style="fill: #5b7c99; stroke: #374151"/>
+    </g>
+   </g>
+   <g id="PathCollection_4">
+    <g clip-path="url(#pab40d49b1e)">
+     <use xlink:href="#m15269acde9" x="277.058153" y="71.308633" style="fill: #5b7c99; stroke: #374151"/>
+    </g>
+   </g>
+   <g id="text_11">
+    <text style="font-weight: 700; font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #ffffff" x="65.460637" y="345.064165" transform="rotate(-0 65.460637 345.064165)">A</text>
+   </g>
+   <g id="text_12">
+    <text style="font-weight: 700; font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #ffffff" x="45.466479" y="128.215437" transform="rotate(-0 45.466479 128.215437)">C</text>
+   </g>
+   <g id="text_13">
+    <text style="font-weight: 700; font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #ffffff" x="277.058153" y="74.213321" transform="rotate(-0 277.058153 74.213321)">E</text>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="pab40d49b1e">
+   <rect x="21.495313" y="24.68" width="524.52" height="332.64"/>
+  </clipPath>
+ </defs>
+</svg>
