@@ -344,7 +344,6 @@
     {
       "community": "A",
       "primary_station": "A",
-      "overflow_station": "",
       "adjusted_demand_daily": 866.4063,
       "raw_served_demand_daily": 866.4063,
       "effective_person_times_daily": 793.6282,
@@ -356,7 +355,6 @@
     {
       "community": "B",
       "primary_station": "B",
-      "overflow_station": "",
       "adjusted_demand_daily": 721.8406,
       "raw_served_demand_daily": 721.8406,
       "effective_person_times_daily": 661.206,
@@ -368,7 +366,6 @@
     {
       "community": "C",
       "primary_station": "C",
-      "overflow_station": "",
       "adjusted_demand_daily": 1146.2397,
       "raw_served_demand_daily": 1000.0,
       "effective_person_times_daily": 875.8831,
@@ -380,7 +377,6 @@
     {
       "community": "D",
       "primary_station": "B",
-      "overflow_station": "",
       "adjusted_demand_daily": 623.95,
       "raw_served_demand_daily": 623.95,
       "effective_person_times_daily": 559.0592,
@@ -392,7 +388,6 @@
     {
       "community": "E",
       "primary_station": "G",
-      "overflow_station": "",
       "adjusted_demand_daily": 966.4292,
       "raw_served_demand_daily": 839.8957,
       "effective_person_times_daily": 722.3103,
@@ -404,7 +399,6 @@
     {
       "community": "F",
       "primary_station": "G",
-      "overflow_station": "",
       "adjusted_demand_daily": 519.832,
       "raw_served_demand_daily": 451.771,
       "effective_person_times_daily": 388.523,
@@ -416,7 +410,6 @@
     {
       "community": "G",
       "primary_station": "G",
-      "overflow_station": "",
       "adjusted_demand_daily": 1071.7304,
       "raw_served_demand_daily": 931.41,
       "effective_person_times_daily": 819.6408,
@@ -428,7 +421,6 @@
     {
       "community": "H",
       "primary_station": "B",
-      "overflow_station": "",
       "adjusted_demand_daily": 657.6711,
       "raw_served_demand_daily": 657.6711,
       "effective_person_times_daily": 589.2733,
@@ -440,7 +432,6 @@
     {
       "community": "I",
       "primary_station": "G",
-      "overflow_station": "",
       "adjusted_demand_daily": 893.9698,
       "raw_served_demand_daily": 776.9234,
       "effective_person_times_daily": 668.1541,
@@ -452,7 +443,6 @@
     {
       "community": "J",
       "primary_station": "B",
-      "overflow_station": "",
       "adjusted_demand_daily": 781.9606,
       "raw_served_demand_daily": 781.9606,
       "effective_person_times_daily": 716.2759,
@@ -466,7 +456,6 @@
     {
       "community": "A",
       "primary_station": "A",
-      "overflow_station": "",
       "adjusted_demand_daily": 866.4063,
       "raw_served_demand_daily": 866.4063,
       "effective_person_times_daily": 793.6282,
@@ -478,7 +467,6 @@
     {
       "community": "B",
       "primary_station": "B",
-      "overflow_station": "",
       "adjusted_demand_daily": 721.8406,
       "raw_served_demand_daily": 721.8406,
       "effective_person_times_daily": 661.206,
@@ -490,7 +478,6 @@
     {
       "community": "C",
       "primary_station": "C",
-      "overflow_station": "",
       "adjusted_demand_daily": 1146.2397,
       "raw_served_demand_daily": 1000.0,
       "effective_person_times_daily": 875.8831,
@@ -502,7 +489,6 @@
     {
       "community": "D",
       "primary_station": "B",
-      "overflow_station": "",
       "adjusted_demand_daily": 623.95,
       "raw_served_demand_daily": 623.95,
       "effective_person_times_daily": 559.0592,
@@ -514,7 +500,6 @@
     {
       "community": "E",
       "primary_station": "G",
-      "overflow_station": "",
       "adjusted_demand_daily": 966.4292,
       "raw_served_demand_daily": 839.8957,
       "effective_person_times_daily": 722.3103,
@@ -526,7 +511,6 @@
     {
       "community": "F",
       "primary_station": "G",
-      "overflow_station": "",
       "adjusted_demand_daily": 519.832,
       "raw_served_demand_daily": 451.771,
       "effective_person_times_daily": 388.523,
@@ -538,7 +522,6 @@
     {
       "community": "G",
       "primary_station": "G",
-      "overflow_station": "",
       "adjusted_demand_daily": 1071.7304,
       "raw_served_demand_daily": 931.41,
       "effective_person_times_daily": 819.6408,
@@ -550,7 +533,6 @@
     {
       "community": "H",
       "primary_station": "B",
-      "overflow_station": "",
       "adjusted_demand_daily": 657.6711,
       "raw_served_demand_daily": 657.6711,
       "effective_person_times_daily": 589.2733,
@@ -562,7 +544,6 @@
     {
       "community": "I",
       "primary_station": "G",
-      "overflow_station": "",
       "adjusted_demand_daily": 893.9698,
       "raw_served_demand_daily": 776.9234,
       "effective_person_times_daily": 668.1541,
@@ -574,7 +555,6 @@
     {
       "community": "J",
       "primary_station": "B",
-      "overflow_station": "",
       "adjusted_demand_daily": 781.9606,
       "raw_served_demand_daily": 781.9606,
       "effective_person_times_daily": 716.2759,
@@ -708,7 +688,6 @@
     {
       "community": "A",
       "primary_station": "A",
-      "overflow_station": "",
       "adjusted_demand_daily": 866.4063,
       "raw_served_demand_daily": 866.4063,
       "effective_person_times_daily": 793.6282,
@@ -720,7 +699,6 @@
     {
       "community": "B",
       "primary_station": "B",
-      "overflow_station": "",
       "adjusted_demand_daily": 721.8406,
       "raw_served_demand_daily": 721.8406,
       "effective_person_times_daily": 661.206,
@@ -732,7 +710,6 @@
     {
       "community": "C",
       "primary_station": "C",
-      "overflow_station": "",
       "adjusted_demand_daily": 1146.2397,
       "raw_served_demand_daily": 1000.0,
       "effective_person_times_daily": 875.8831,
@@ -744,7 +721,6 @@
     {
       "community": "D",
       "primary_station": "B",
-      "overflow_station": "",
       "adjusted_demand_daily": 623.95,
       "raw_served_demand_daily": 623.95,
       "effective_person_times_daily": 559.0592,
@@ -756,7 +732,6 @@
     {
       "community": "E",
       "primary_station": "G",
-      "overflow_station": "",
       "adjusted_demand_daily": 966.4292,
       "raw_served_demand_daily": 839.8957,
       "effective_person_times_daily": 722.3103,
@@ -768,7 +743,6 @@
     {
       "community": "F",
       "primary_station": "G",
-      "overflow_station": "",
       "adjusted_demand_daily": 519.832,
       "raw_served_demand_daily": 451.771,
       "effective_person_times_daily": 388.523,
@@ -780,7 +754,6 @@
     {
       "community": "G",
       "primary_station": "G",
-      "overflow_station": "",
       "adjusted_demand_daily": 1071.7304,
       "raw_served_demand_daily": 931.41,
       "effective_person_times_daily": 819.6408,
@@ -792,7 +765,6 @@
     {
       "community": "H",
       "primary_station": "B",
-      "overflow_station": "",
       "adjusted_demand_daily": 657.6711,
       "raw_served_demand_daily": 657.6711,
       "effective_person_times_daily": 589.2733,
@@ -804,7 +776,6 @@
     {
       "community": "I",
       "primary_station": "G",
-      "overflow_station": "",
       "adjusted_demand_daily": 893.9698,
       "raw_served_demand_daily": 776.9234,
       "effective_person_times_daily": 668.1541,
@@ -816,7 +787,6 @@
     {
       "community": "J",
       "primary_station": "B",
-      "overflow_station": "",
       "adjusted_demand_daily": 781.9606,
       "raw_served_demand_daily": 781.9606,
       "effective_person_times_daily": 716.2759,

@@ -306,9 +306,7 @@
     {
       "community": "A",
       "primary_station": "A",
-      "overflow_station": "",
       "primary_load_daily": 715.0647079323185,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 147.7722904168279,
       "raw_served_demand_daily": 715.0647,
       "effective_person_times_daily": 665.7679,
@@ -324,9 +322,7 @@
     {
       "community": "B",
       "primary_station": "A",
-      "overflow_station": "",
       "primary_load_daily": 592.025166788147,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 122.34545197127738,
       "raw_served_demand_daily": 592.0252,
       "effective_person_times_daily": 521.6272,
@@ -342,9 +338,7 @@
     {
       "community": "C",
       "primary_station": "C",
-      "overflow_station": "",
       "primary_load_daily": 1000,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 146.2396775798445,
       "raw_served_demand_daily": 1000,
       "effective_person_times_daily": 875.8831,
@@ -360,9 +354,7 @@
     {
       "community": "D",
       "primary_station": "A",
-      "overflow_station": "",
       "primary_load_daily": 511.9503827346794,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 105.79753104475088,
       "raw_served_demand_daily": 511.9504,
       "effective_person_times_daily": 435.6269,
@@ -378,9 +370,7 @@
     {
       "community": "E",
       "primary_station": "E",
-      "overflow_station": "",
       "primary_load_daily": 839.8956907368795,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 126.53349444675177,
       "raw_served_demand_daily": 839.8957,
       "effective_person_times_daily": 739.1082,
@@ -396,9 +386,7 @@
     {
       "community": "F",
       "primary_station": "E",
-      "overflow_station": "",
       "primary_load_daily": 451.77097874130834,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 68.06102383929863,
       "raw_served_demand_daily": 451.771,
       "effective_person_times_daily": 388.523,
@@ -414,9 +402,7 @@
     {
       "community": "G",
       "primary_station": "E",
-      "overflow_station": "",
       "primary_load_daily": 931.409958687936,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 140.3204685237639,
       "raw_served_demand_daily": 931.41,
       "effective_person_times_daily": 801.0126,
@@ -432,9 +418,7 @@
     {
       "community": "H",
       "primary_station": "A",
-      "overflow_station": "",
       "primary_load_daily": 539.5828435048525,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 111.50794014838141,
       "raw_served_demand_daily": 539.5828,
       "effective_person_times_daily": 459.0985,
@@ -450,9 +434,7 @@
     {
       "community": "I",
       "primary_station": "E",
-      "overflow_station": "",
       "primary_load_daily": 776.9233718338762,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 117.046474032084,
       "raw_served_demand_daily": 776.9234,
       "effective_person_times_daily": 668.1541,
@@ -468,9 +450,7 @@
     {
       "community": "J",
       "primary_station": "A",
-      "overflow_station": "",
       "primary_load_daily": 641.376899040003,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 132.54427514069755,
       "raw_served_demand_daily": 641.3769,
       "effective_person_times_daily": 584.2553,
@@ -488,9 +468,7 @@
     {
       "community": "A",
       "primary_station": "A",
-      "overflow_station": "",
       "primary_load_daily": 716.3461865973861,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 144.28517904816044,
       "raw_served_demand_daily": 716.3462,
       "effective_person_times_daily": 673.0612,
@@ -506,9 +484,7 @@
     {
       "community": "B",
       "primary_station": "A",
-      "overflow_station": "",
       "primary_load_daily": 591.6185675987122,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 119.16276313225217,
       "raw_served_demand_daily": 591.6186,
       "effective_person_times_daily": 526.3045,
@@ -524,9 +500,7 @@
     {
       "community": "C",
       "primary_station": "C",
-      "overflow_station": "",
       "primary_load_daily": 1000,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 146.2396775798445,
       "raw_served_demand_daily": 1000,
       "effective_person_times_daily": 875.8831,
@@ -542,9 +516,7 @@
     {
       "community": "D",
       "primary_station": "A",
-      "overflow_station": "",
       "primary_load_daily": 511.70513313564174,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 103.06674082406323,
       "raw_served_demand_daily": 511.7051,
       "effective_person_times_daily": 439.8487,
@@ -560,9 +532,7 @@
     {
       "community": "E",
       "primary_station": "E",
-      "overflow_station": "",
       "primary_load_daily": 839.8956907368795,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 126.53349444675177,
       "raw_served_demand_daily": 839.8957,
       "effective_person_times_daily": 739.1082,
@@ -578,9 +548,7 @@
     {
       "community": "F",
       "primary_station": "E",
-      "overflow_station": "",
       "primary_load_daily": 451.77097874130834,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 68.06102383929863,
       "raw_served_demand_daily": 451.771,
       "effective_person_times_daily": 388.523,
@@ -596,9 +564,7 @@
     {
       "community": "G",
       "primary_station": "E",
-      "overflow_station": "",
       "primary_load_daily": 931.409958687936,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 140.3204685237639,
       "raw_served_demand_daily": 931.41,
       "effective_person_times_daily": 801.0126,
@@ -614,9 +580,7 @@
     {
       "community": "H",
       "primary_station": "A",
-      "overflow_station": "",
       "primary_load_daily": 539.334951506289,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 108.63188986130888,
       "raw_served_demand_daily": 539.335,
       "effective_person_times_daily": 463.5842,
@@ -632,9 +596,7 @@
     {
       "community": "I",
       "primary_station": "E",
-      "overflow_station": "",
       "primary_load_daily": 776.9233718338762,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 117.046474032084,
       "raw_served_demand_daily": 776.9234,
       "effective_person_times_daily": 668.1541,
@@ -650,9 +612,7 @@
     {
       "community": "J",
       "primary_station": "A",
-      "overflow_station": "",
       "primary_load_daily": 640.9951611619709,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 129.10810907860696,
       "raw_served_demand_daily": 640.9952,
       "effective_person_times_daily": 589.4322,
@@ -772,9 +732,7 @@
     {
       "community": "A",
       "primary_station": "A",
-      "overflow_station": "",
       "primary_load_daily": 716.3461865973861,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 144.28517904816044,
       "raw_served_demand_daily": 716.3462,
       "effective_person_times_daily": 673.0612,
@@ -790,9 +748,7 @@
     {
       "community": "B",
       "primary_station": "A",
-      "overflow_station": "",
       "primary_load_daily": 591.6185675987122,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 119.16276313225217,
       "raw_served_demand_daily": 591.6186,
       "effective_person_times_daily": 526.3045,
@@ -808,9 +764,7 @@
     {
       "community": "C",
       "primary_station": "C",
-      "overflow_station": "",
       "primary_load_daily": 1000,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 146.2396775798445,
       "raw_served_demand_daily": 1000,
       "effective_person_times_daily": 875.8831,
@@ -826,9 +780,7 @@
     {
       "community": "D",
       "primary_station": "A",
-      "overflow_station": "",
       "primary_load_daily": 511.70513313564174,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 103.06674082406323,
       "raw_served_demand_daily": 511.7051,
       "effective_person_times_daily": 439.8487,
@@ -844,9 +796,7 @@
     {
       "community": "E",
       "primary_station": "E",
-      "overflow_station": "",
       "primary_load_daily": 839.8956907368795,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 126.53349444675177,
       "raw_served_demand_daily": 839.8957,
       "effective_person_times_daily": 739.1082,
@@ -862,9 +812,7 @@
     {
       "community": "F",
       "primary_station": "E",
-      "overflow_station": "",
       "primary_load_daily": 451.77097874130834,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 68.06102383929863,
       "raw_served_demand_daily": 451.771,
       "effective_person_times_daily": 388.523,
@@ -880,9 +828,7 @@
     {
       "community": "G",
       "primary_station": "E",
-      "overflow_station": "",
       "primary_load_daily": 931.409958687936,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 140.3204685237639,
       "raw_served_demand_daily": 931.41,
       "effective_person_times_daily": 801.0126,
@@ -898,9 +844,7 @@
     {
       "community": "H",
       "primary_station": "A",
-      "overflow_station": "",
       "primary_load_daily": 539.334951506289,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 108.63188986130888,
       "raw_served_demand_daily": 539.335,
       "effective_person_times_daily": 463.5842,
@@ -916,9 +860,7 @@
     {
       "community": "I",
       "primary_station": "E",
-      "overflow_station": "",
       "primary_load_daily": 776.9233718338762,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 117.046474032084,
       "raw_served_demand_daily": 776.9234,
       "effective_person_times_daily": 668.1541,
@@ -934,9 +876,7 @@
     {
       "community": "J",
       "primary_station": "A",
-      "overflow_station": "",
       "primary_load_daily": 640.9951611619709,
-      "overflow_load_daily": 0,
       "unmet_load_daily": 129.10810907860696,
       "raw_served_demand_daily": 640.9952,
       "effective_person_times_daily": 589.4322,
