@@ -268,17 +268,37 @@ def theoretical_monthly_demand(
             "半失能": pop["semi_disabled"],
             "失能": pop["disabled"],
         }
+        for level in CARE_LEVEL_ORDER:
+            for service in SERVICE_ORDER:
+                rows.append(
+                    {
+                        "community": pop["community"],
+                        "care_level": level,
+                        "service": service,
+                        "theoretical_monthly_demand": counts[level] * service_demand[level][service],
+                    }
+                )
+    validate_theoretical_demand_detail(rows)
+    return rows
+
+
+def aggregate_theoretical_demand(rows: List[Dict[str, float]]) -> List[Dict[str, float]]:
+    grouped: Dict[tuple[str, str], float] = {}
+    for row in rows:
+        key = (str(row["community"]), str(row["service"]))
+        grouped[key] = grouped.get(key, 0.0) + float(row["theoretical_monthly_demand"])
+    result: List[Dict[str, float]] = []
+    for community in sorted({key[0] for key in grouped}):
         for service in SERVICE_ORDER:
-            value = sum(counts[level] * service_demand[level][service] for level in CARE_LEVEL_ORDER)
-            rows.append(
+            result.append(
                 {
-                    "community": pop["community"],
+                    "community": community,
                     "service": service,
-                    "theoretical_monthly_demand": value,
+                    "theoretical_monthly_demand": grouped.get((community, service), 0.0),
                 }
             )
-    validate_service_summary(rows, "theoretical_monthly_demand")
-    return rows
+    validate_service_summary(result, "theoretical_monthly_demand")
+    return result
 
 
 def affordability_adjusted_demand(
@@ -403,6 +423,18 @@ def validate_adjusted_demand(rows: List[Dict[str, float]]) -> None:
             )
 
 
+def validate_theoretical_demand_detail(rows: List[Dict[str, float]]) -> None:
+    communities = {str(row["community"]) for row in rows}
+    expected = len(communities) * len(CARE_LEVEL_ORDER) * len(SERVICE_ORDER)
+    assert len(rows) == expected, f"Expected {expected} theoretical detail rows, got {len(rows)}"
+    for row in rows:
+        assert row["care_level"] in CARE_LEVEL_ORDER, f"Unexpected care level: {row['care_level']}"
+        assert row["service"] in SERVICE_ORDER, f"Unexpected service: {row['service']}"
+        assert row["theoretical_monthly_demand"] >= 0, (
+            f"Negative theoretical demand found for {row['community']}-{row['care_level']}-{row['service']}"
+        )
+
+
 def write_csv(path: Path, rows: List[Dict[str, float]]) -> None:
     if not rows:
         return
@@ -436,3 +468,82 @@ def integerize_rows(rows: List[Dict[str, float]], fields: List[str]) -> List[Dic
                 new_row[key] = value
         integerized.append(new_row)
     return integerized
+
+
+def population_transition_matrix(
+    transition: Dict[str, float],
+    death_rate: float = DEATH_RATE,
+    growth_rate: float = ELDER_GROWTH_RATE,
+) -> List[List[float]]:
+    survival = 1.0 - death_rate
+    p12 = transition["自理->半失能"]
+    p23 = transition["半失能->失能"]
+    return [
+        [survival * (1.0 - p12) + growth_rate, growth_rate, growth_rate],
+        [survival * p12, survival * (1.0 - p23), 0.0],
+        [0.0, survival * p23, survival],
+    ]
+
+
+def apply_population_transition(
+    state: List[float],
+    transition_matrix: List[List[float]],
+) -> List[float]:
+    return [
+        sum(transition_matrix[row_idx][col_idx] * state[col_idx] for col_idx in range(3))
+        for row_idx in range(3)
+    ]
+
+
+def project_elderly_population_matrix(
+    communities: List[CommunityRecord],
+    transition: Dict[str, float],
+    years: int = YEARS,
+    death_rate: float = DEATH_RATE,
+    growth_rate: float = ELDER_GROWTH_RATE,
+) -> List[Dict[str, float]]:
+    matrix = population_transition_matrix(
+        transition=transition,
+        death_rate=death_rate,
+        growth_rate=growth_rate,
+    )
+    results: List[Dict[str, float]] = []
+    for record in communities:
+        state = [record.self_care, record.semi_disabled, record.disabled]
+        community_rows: List[Dict[str, float]] = []
+        for year in range(1, years + 1):
+            previous_total = sum(state)
+            state = apply_population_transition(state, matrix)
+            row = {
+                "year": year,
+                "community": record.community,
+                "self_care": state[0],
+                "semi_disabled": state[1],
+                "disabled": state[2],
+                "elderly_total": sum(state),
+                "new_entrants": previous_total * growth_rate,
+            }
+            results.append(row)
+            community_rows.append(row)
+        validate_projection_path(record, community_rows, years)
+    return results
+
+
+def aggregate_population_metrics(rows: List[Dict[str, float]], year: int | None = None) -> Dict[str, float]:
+    filtered = [row for row in rows if year is None or int(row["year"]) == year]
+    total_self = sum(float(row["self_care"]) for row in filtered)
+    total_semi = sum(float(row["semi_disabled"]) for row in filtered)
+    total_disabled = sum(float(row["disabled"]) for row in filtered)
+    total_elderly = sum(float(row["elderly_total"]) for row in filtered)
+    disabled_share = total_disabled / total_elderly if total_elderly > 1e-12 else 0.0
+    return {
+        "self_care": total_self,
+        "semi_disabled": total_semi,
+        "disabled": total_disabled,
+        "elderly_total": total_elderly,
+        "disabled_share": disabled_share,
+    }
+
+
+def aggregate_service_metric(rows: List[Dict[str, float]], field: str) -> float:
+    return sum(float(row[field]) for row in rows)

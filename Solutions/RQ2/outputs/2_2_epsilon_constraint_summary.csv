@@ -1,0 +1,6 @@
+﻿scheme_label,scheme_code,scheme_detail,station_count,build_cost_wan,served_population_coverage,weighted_served_population_coverage,served_demand_coverage,average_service_access_performance,minimum_service_access_performance,capacity_safety_rate,max_station_utilization,annual_net_profit_after_policy_subsidy,profit_compliant,epsilon_min_access_threshold,epsilon_feasible_count
+epsilon_min_access_0.40,3010300000,A-大型;C-小型;E-大型,3,108.0,0.848741,0.848741,0.847617,0.724755,0.449791,0.0,1.0,-20168.4,0,0.4,1539
+epsilon_min_access_0.45,0002020300,D-中型;F-中型;H-大型,3,109.0,0.848555,0.848555,0.847617,0.722006,0.598674,0.0,1.0,-163721.01,0,0.45,694
+epsilon_min_access_0.50,0002020300,D-中型;F-中型;H-大型,3,109.0,0.848555,0.848555,0.847617,0.722006,0.598674,0.0,1.0,-163721.01,0,0.5,476
+epsilon_min_access_0.55,0002020300,D-中型;F-中型;H-大型,3,109.0,0.848555,0.848555,0.847617,0.722006,0.598674,0.0,1.0,-163721.01,0,0.55,155
+epsilon_min_access_0.60,0202300000,B-中型;D-中型;E-大型,3,109.0,0.848293,0.848293,0.847617,0.730723,0.670681,0.0,1.0,268754.15,1,0.6,66

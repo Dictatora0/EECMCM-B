@@ -30,6 +30,7 @@ compute_capacity_safety_rate = RQ4_COMMON.compute_capacity_safety_rate
 build_station_scale_map = RQ4_COMMON.build_station_scale_map
 build_station_plan_text = RQ4_COMMON.build_station_plan_text
 summarize_monte_carlo_metric = RQ4_COMMON.summarize_monte_carlo_metric
+q3_summary_row = RQ4_COMMON.q3_summary_row
 
 
 def test_scenario_config_contains_required_traceable_fields() -> None:
@@ -171,6 +172,17 @@ def test_station_plan_helpers_build_consistent_strings_and_maps() -> None:
     assert build_station_plan_text(scale_map) == plan
 
 
+def test_q2_progress_plan_text_should_be_built_from_station_mapping() -> None:
+    class StubStation:
+        def __init__(self, community: str, scale: str) -> None:
+            self.community = community
+            self.scale = scale
+
+    stations = [StubStation("C", "大型"), StubStation("A", "小型")]
+    scale_map = {station.community: station.scale for station in stations}
+    assert build_station_plan_text(scale_map) == "A-小型;C-大型"
+
+
 def test_monte_carlo_metric_summary_reports_mean_quantiles_and_risk() -> None:
     summary = summarize_monte_carlo_metric(
         name="annual_net_profit",
@@ -184,6 +196,59 @@ def test_monte_carlo_metric_summary_reports_mean_quantiles_and_risk() -> None:
     assert summary["risk_probability"] == 0.2
 
 
+def test_q3_summary_row_contains_coverage_fields() -> None:
+    class StubEval:
+        pass
+
+    evaluation = StubEval()
+    evaluation.station_prices = {"A": {"助餐": 10.0, "日间照料": 10.0, "上门护理": 10.0, "康复理疗": 10.0, "助浴": 10.0, "紧急救助": 0.0}}
+    evaluation.iteration_count = 1
+    evaluation.converged = 1
+    evaluation.damping_used = 0
+    evaluation.profit_compliant = 1
+    evaluation.satisfaction_compliant = 1
+    evaluation.feasible_station_count = 1
+    evaluation.average_service_satisfaction = 0.8
+    evaluation.minimum_service_satisfaction = 0.7
+    evaluation.average_service_access_performance = 0.75
+    evaluation.minimum_service_access_performance = 0.65
+    evaluation.vulnerable_service_satisfaction = 0.72
+    evaluation.low_income_service_satisfaction = 0.7
+    evaluation.low_income_served_coverage = 1.0
+    evaluation.served_population_coverage = 0.78
+    evaluation.weighted_served_population_coverage = 0.8
+    evaluation.served_demand_coverage = 0.82
+    evaluation.gini_access = 0.1
+    evaluation.theil_access = 0.01
+    evaluation.max_min_gap = 0.2
+    evaluation.annual_government_subsidy = 1000.0
+    evaluation.annual_service_revenue = 9000.0
+    evaluation.annual_direct_cost = 8000.0
+    evaluation.annual_fixed_cost = 1000.0
+    evaluation.annual_depreciation = 500.0
+    evaluation.annual_total_cost = 9500.0
+    evaluation.annual_net_profit_before_subsidy = -500.0
+    evaluation.annual_net_profit_after_subsidy = 500.0
+    evaluation.annual_net_profit = 500.0
+    evaluation.profit_rate = 500.0 / 9500.0
+    evaluation.pareto_rank = 1
+    evaluation.subsidy_policy_label = "none"
+
+    scenario = ScenarioDefinition("S0", "基准", {})
+    row = q3_summary_row(
+        scenario=scenario,
+        scheme_type="financial_sustainable_scheme",
+        evaluation=evaluation,
+        station_plan="A-小型",
+        fiscal_gap_if_any=0.0,
+    )
+    assert "served_population_coverage" in row
+    assert "weighted_served_population_coverage" in row
+    assert "served_demand_coverage" in row
+    assert row["served_population_coverage"] == 0.78
+    assert row["weighted_served_population_coverage"] == 0.8
+
+
 def run_all_tests() -> None:
     tests = [
         test_scenario_config_contains_required_traceable_fields,
@@ -194,7 +259,9 @@ def run_all_tests() -> None:
         test_sensitivity_level_thresholds,
         test_robustness_helpers_follow_new_definitions,
         test_station_plan_helpers_build_consistent_strings_and_maps,
+        test_q2_progress_plan_text_should_be_built_from_station_mapping,
         test_monte_carlo_metric_summary_reports_mean_quantiles_and_risk,
+        test_q3_summary_row_contains_coverage_fields,
     ]
     for test in tests:
         test()

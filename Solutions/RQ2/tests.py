@@ -7,6 +7,7 @@ from common import (
     CommunityDemand,
     CandidateStation,
     StationScale,
+    allocate_with_response_scores,
     choose_overflow_station,
     choose_primary_station,
     compute_annual_financial_metrics,
@@ -22,6 +23,9 @@ from common import (
     sort_scheme_evaluations,
     SERVICE_ORDER,
 )
+from importlib.util import module_from_spec, spec_from_file_location
+from pathlib import Path
+import sys
 
 
 def test_distance_satisfaction_respects_radius_limit() -> None:
@@ -215,6 +219,49 @@ def test_overflow_station_skips_primary_and_zero_capacity_station() -> None:
     assert selected == "C"
 
 
+def test_allocate_with_response_scores_uses_single_best_station_and_proportional_capacity() -> None:
+    stations = [
+        CandidateStation("A", "小型", 18.0, 2000.0, 5.0),
+        CandidateStation("B", "小型", 18.0, 2000.0, 50.0),
+    ]
+    communities = [
+        CommunityDemand(
+            community="C",
+            elderly_population=100.0,
+            adjusted_monthly_demand={service: (150.0 if service == "助餐" else 0.0) for service in SERVICE_ORDER},
+        ),
+        CommunityDemand(
+            community="D",
+            elderly_population=100.0,
+            adjusted_monthly_demand={service: (150.0 if service == "助餐" else 0.0) for service in SERVICE_ORDER},
+        ),
+    ]
+    distance_matrix = {
+        "C": {"A": 100.0, "B": 500.0},
+        "D": {"A": 150.0, "B": 450.0},
+    }
+    allocations, station_metrics, next_response = allocate_with_response_scores(
+        stations=stations,
+        communities=communities,
+        distance_matrix=distance_matrix,
+        distance_rules=[(300.0, 1.0), (500.0, 0.9), (650.0, 0.75), (1000.0, 0.6)],
+        response_rules=[(0.60, 1.0), (0.75, 0.93), (0.85, 0.85), (0.95, 0.72), (1.0, 0.60)],
+        response_by_station={"A": 1.0, "B": 1.0},
+        service_costs={service: {"price": 10.0, "direct_cost": 5.0} for service in SERVICE_ORDER},
+    )
+    assert next_response["A"] == 0.60
+    assert next_response["B"] == 1.0
+    assert [row.primary_station for row in allocations] == ["A", "A"]
+    assert all(row.overflow_station is None for row in allocations)
+    assert all(abs(row.raw_served_demand_daily - 2.5) < 1e-9 for row in allocations)
+    assert all(abs(row.unmet_load - 2.5) < 1e-9 for row in allocations)
+    assert all(abs(row.demand_service_ratio - 0.5) < 1e-9 for row in allocations)
+    assert all(abs(row.served_population_covered - 50.0) < 1e-9 for row in allocations)
+    station_map = {row.community: row for row in station_metrics}
+    assert abs(station_map["A"].total_load - 5.0) < 1e-9
+    assert abs(station_map["B"].total_load) < 1e-9
+
+
 def test_evaluate_scheme_respects_custom_budget_limit() -> None:
     communities = [
         CommunityDemand(
@@ -263,6 +310,46 @@ def test_evaluate_scheme_respects_custom_budget_limit() -> None:
     ) is not None
 
 
+def test_evaluate_scheme_served_population_coverage_uses_fractional_share() -> None:
+    communities = [
+        CommunityDemand(
+            community=name,
+            elderly_population=100.0,
+            adjusted_monthly_demand={service: (150.0 if service == "助餐" else 0.0) for service in SERVICE_ORDER},
+        )
+        for name in ["A", "B"]
+    ]
+    distance_matrix = {
+        "A": {"A": 0.0, "B": 1500.0},
+        "B": {"A": 100.0, "B": 1500.0},
+    }
+    scales = {
+        "小型": StationScale("小型", 18.0, 2000.0, 5.0),
+        "中型": StationScale("中型", 32.0, 3200.0, 8.0),
+        "大型": StationScale("大型", 45.0, 4400.0, 12.0),
+    }
+    satisfaction_rules = {
+        "distance": [(300.0, 1.0), (500.0, 0.9), (650.0, 0.75), (1000.0, 0.6)],
+        "response": [(0.60, 1.0), (0.75, 0.93), (0.85, 0.85), (0.95, 0.72), (1.0, 0.60)],
+    }
+    service_costs = {
+        service: {"price": 10.0, "direct_cost": 5.0}
+        for service in SERVICE_ORDER
+    }
+    result = evaluate_scheme(
+        scheme_code=(1, 0),
+        communities=communities,
+        distance_matrix=distance_matrix,
+        scales=scales,
+        satisfaction_rules=satisfaction_rules,
+        service_costs=service_costs,
+        budget_limit=120.0,
+    )
+    assert result is not None
+    assert abs(result.served_population_coverage - 0.5) < 1e-9
+    assert abs(result.weighted_served_population_coverage - 0.5) < 1e-9
+
+
 def test_scheme_profit_compliance_requires_all_station_flags() -> None:
     metrics = [
         StationMetrics("A", "小型", 1000, 10, 0, 10, 0.01, 1000, 800, 730000, 9000, 0, -738800, -738800, annual_revenue=1000, annual_subsidy=200, annual_total_cost=1200, annual_net_profit=0, profit_rate=0.0, profit_compliant=1),
@@ -304,6 +391,36 @@ def test_solve_location_milp_returns_budget_feasible_layout() -> None:
     assert spent <= 50.0 + 1e-9
 
 
+def test_multiobjective_dominance_prefers_better_coverage_and_lower_cost() -> None:
+    class Stub:
+        def __init__(self, served, min_access, safety, cost):
+            self.served_population_coverage = served
+            self.minimum_service_access_performance = min_access
+            self.capacity_safety_rate = safety
+            self.total_build_cost = cost
+
+    path = Path(__file__).resolve().parent / "2_2_multiobjective_extension.py"
+    spec = spec_from_file_location("rq2_multiobjective_extension_test", path)
+    assert spec and spec.loader
+    module = module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+
+    better = Stub(0.90, 0.55, 0.80, 90.0)
+    worse = Stub(0.88, 0.50, 0.75, 100.0)
+    assert module.pareto_dominates(better, worse) is True
+    assert module.pareto_dominates(worse, better) is False
+
+
+def test_rq2_main_script_keeps_best_scheme_name_for_baseline() -> None:
+    path = Path(__file__).resolve().parent / "2_1.py"
+    text = path.read_text(encoding="utf-8")
+    assert 'write_scheme_bundle("2_1_best_scheme", baseline_best' in text
+    assert 'write_scheme_bundle("2_1_best_scheme",\n            optimized_best' not in text
+    assert '2_1_extension_optimized_scheme' in text
+    assert '2_1_extension_robust_scheme' in text
+
+
 def run_all_tests() -> None:
     tests = [
         test_distance_satisfaction_respects_radius_limit,
@@ -318,9 +435,13 @@ def run_all_tests() -> None:
         test_select_safe_scheme_respects_higher_threshold,
         test_primary_station_always_prefers_highest_satisfaction_choice,
         test_overflow_station_skips_primary_and_zero_capacity_station,
+        test_allocate_with_response_scores_uses_single_best_station_and_proportional_capacity,
         test_evaluate_scheme_respects_custom_budget_limit,
+        test_evaluate_scheme_served_population_coverage_uses_fractional_share,
         test_scheme_profit_compliance_requires_all_station_flags,
         test_solve_location_milp_returns_budget_feasible_layout,
+        test_multiobjective_dominance_prefers_better_coverage_and_lower_cost,
+        test_rq2_main_script_keeps_best_scheme_name_for_baseline,
     ]
     for test in tests:
         test()

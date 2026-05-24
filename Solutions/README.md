@@ -9,19 +9,31 @@
 - `RQ2/`
   - 选址、规模、分配、容量与基准价财务评价。
 - `RQ3/`
-  - 站点级统一溢价定价、固定点迭代、双方案比较。
+  - 以老人满意度为主目标的定价、固定点迭代和主结果/辅助扩展输出。
 - `RQ4/`
   - 情景重求解、灵敏度分析、鲁棒性分析与解释输出。
 
 ## 推荐运行顺序
 
-按当前实现，完整重跑建议严格按以下顺序执行：
+推荐在仓库根目录使用统一脚本：
 
 ```bash
-python Solutions/RQ1/run_all.py
-python Solutions/RQ2/2_1.py
-python Solutions/RQ3/3_1.py
-python Solutions/RQ4/4_1.py
+cd /Users/lifulin/Desktop/B
+bash run_full_pipeline.sh full
+```
+
+脚本内部按以下顺序执行：
+
+```bash
+python3 Solutions/RQ1/1_1.py
+python3 Solutions/RQ1/1_2.py
+python3 Solutions/RQ1/1_3.py
+python3 Solutions/RQ1/1_4_validation_extension.py
+python3 Solutions/RQ2/2_1.py
+python3 Solutions/RQ2/2_2_multiobjective_extension.py
+python3 Solutions/RQ3/3_1.py --max-candidate-profiles 64 --max-candidates-per-station 30 --price-grid-level full
+python3 Solutions/RQ3/3_4_joint_feasibility_diagnostics.py
+python3 Solutions/RQ4/4_1.py
 ```
 
 若只想做分题重跑，可按下表处理。
@@ -30,52 +42,78 @@ python Solutions/RQ4/4_1.py
 
 ### RQ1
 
-- 主脚本：`python Solutions/RQ1/run_all.py`
+- 主脚本：
+  - `python3 Solutions/RQ1/1_1.py`
+  - `python3 Solutions/RQ1/1_2.py`
+  - `python3 Solutions/RQ1/1_3.py`
+  - `python3 Solutions/RQ1/1_4_validation_extension.py`
 - 作用：
   - 生成人口高精度结果；
   - 生成理论需求；
   - 生成消费约束后的高精度需求。
+  - 生成状态转移矩阵验证和局部敏感性扩展输出。
 - 下游依赖：
   - RQ2 读取 RQ1 高精度人口与调整后需求；
   - RQ3 通过 RQ2 和 RQ1 高精度文件间接使用；
   - RQ4 的 S1、S2 会重跑 RQ1。
-- 输出说明：
-  - [RQ1 outputs README](./RQ1/outputs/README.md)
+- 输出位置：
+  - `Solutions/RQ1/outputs/`
 
 ### RQ2
 
-- 主脚本：`python Solutions/RQ2/2_1.py`
+- 主脚本：`python3 Solutions/RQ2/2_1.py`
+- 扩展脚本：`python3 Solutions/RQ2/2_2_multiobjective_extension.py`
 - 输入来源：
   - RQ1 高精度人口与消费约束需求。
 - 作用：
   - 求问题2主方案；
   - 输出安全优先备选方案；
   - 输出小区分配、站点负荷和基准价财务评价。
+  - 扩展输出 Pareto 前沿、`epsilon-constraint` 代表方案和容量瓶颈分析。
 - 下游依赖：
   - RQ3 默认读取 `best_scheme` 相关输出；
   - RQ4 的 Q2 情景表来自本题重求解结果。
-- 输出说明：
-  - [RQ2 outputs README](./RQ2/outputs/README.md)
+- 输出位置：
+  - `Solutions/RQ2/outputs/`
 
 ### RQ3
 
-- 主脚本：`python Solutions/RQ3/3_1.py`
+- 主脚本：`python3 Solutions/RQ3/3_1.py`
+- 扩展脚本：`python3 Solutions/RQ3/3_4_joint_feasibility_diagnostics.py`
 - 输入来源：
   - RQ2 主方案输出；
   - RQ1 高精度人口与消费约束需求。
 - 作用：
-  - 在既定布局上搜索站点级统一溢价方案；
-  - 输出 `financial_sustainable_scheme` 与 `fairness_priority_scheme`；
-  - 输出固定点迭代轨迹、站点财务表和小区服务绩效表。
+  - 在既定布局上搜索以老人满意度为主目标的定价方案；
+  - 输出题面主结果 `3_1_best_price_scheme_*`；
+  - 输出 `3_1_aux_financial_best_price_scheme_*` 与 `3_1_aux_fairness_best_price_scheme_*` 辅助扩展方案；
+  - 输出固定点迭代轨迹、站点财务表和小区满意度/可及绩效表。
+  - 扩展输出逐站联合可行性绑定约束诊断。
+  - 同脚本支持站点—服务项目级扩搜：
+    `python3 Solutions/RQ3/3_1.py --expanded-search-only --scenarios S0,S4 --search-levels light,medium,heavy --price-grid full --keep-near-boundary --random-seed 42`
 - 下游依赖：
   - RQ4 的 Q3 情景表来自本题重求解结果。
 - 说明文档：
   - [RQ3 接口与口径说明](./RQ3/README.md)
-  - [RQ3 outputs README](./RQ3/outputs/README.md)
+  - 输出位置：`Solutions/RQ3/outputs/`
+  - 其中 `3_1_best_price_scheme_*` 为主结果；`3_1_aux_*`、`3_2_aux_*` 为辅助扩展结果。
+
+### 兼容命名
+
+仓库内部主口径已统一到 `satisfaction_*`。若你在旧 CSV、缓存或审计链路中看到下列名称，它们都属于兼容层：
+
+- `fairness_priority_scheme` -> `satisfaction_priority_scheme`
+- `fair_satisfaction_compliant` -> `satisfaction_compliant`
+- `q3_fairness_minimum_service_access_performance` -> `q3_satisfaction_minimum_service_access_performance`
+- `q3_fairness_scheme_performance_stability` -> `q3_satisfaction_scheme_performance_stability`
+
+完整对照表见：
+
+- [兼容字段矩阵](./compatibility_matrix.md)
 
 ### RQ4
 
-- 主脚本：`python Solutions/RQ4/4_1.py`
+- 主脚本：`python3 Solutions/RQ4/4_1.py`
 - 输入来源：
   - 根据情景不同，复用或重跑 RQ1、RQ2、RQ3。
 - 作用：
@@ -83,8 +121,8 @@ python Solutions/RQ4/4_1.py
   - 输出灵敏度系数；
   - 输出鲁棒性指标；
   - 输出 S4 预算情景专项诊断和论文解释要点。
-- 输出说明：
-  - [RQ4 outputs README](./RQ4/outputs/README.md)
+- 输出位置：
+  - `Solutions/RQ4/outputs/`
 
 ## 情景重跑规则
 
@@ -111,8 +149,11 @@ RQ4 当前情景路径如下：
 
 ```text
 RQ1 high-precision outputs
+  -> RQ1 validation extension outputs
   -> RQ2 best scheme outputs
-    -> RQ3 pricing outputs
+    -> RQ2 multiobjective extension outputs
+    -> RQ3 satisfaction-objective pricing outputs
+      -> RQ3 joint-feasibility diagnostics
       -> RQ4 scenario summaries / sensitivity / robustness
 ```
 
@@ -132,13 +173,67 @@ RQ1 high-precision outputs
 - RQ4 <- RQ1 + RQ2 + RQ3
   - 按情景路径重求解并写出情景总表
 
-## 常用说明文档
+## 常用命令
 
-- [RQ1 outputs README](./RQ1/outputs/README.md)
-- [RQ2 outputs README](./RQ2/outputs/README.md)
-- [RQ3 README](./RQ3/README.md)
-- [RQ3 outputs README](./RQ3/outputs/README.md)
-- [RQ4 outputs README](./RQ4/outputs/README.md)
+### 最短版
+
+```bash
+cd /Users/lifulin/Desktop/B
+
+# 完整重跑
+bash run_full_pipeline.sh full
+
+# 入口守护测试
+bash run_full_pipeline.sh test
+
+# RQ3 扩搜：light + medium + heavy
+bash run_full_pipeline.sh rq3-expanded all
+
+# 清空所有 outputs 和缓存
+bash run_full_pipeline.sh clean
+```
+
+### 完整版
+
+```bash
+cd /Users/lifulin/Desktop/B
+
+# 清空所有 outputs 和缓存
+bash run_full_pipeline.sh clean
+
+# 完整重跑，并包含 3 个算法升级扩展
+bash run_full_pipeline.sh full
+
+# 入口守护测试
+bash run_full_pipeline.sh test
+
+# 仅跑 RQ3 测试
+bash run_full_pipeline.sh test-rq3
+
+# RQ3 扩搜：light + medium + heavy
+bash run_full_pipeline.sh rq3-expanded all
+
+# RQ3 扩搜：light
+bash run_full_pipeline.sh rq3-expanded light
+
+# RQ3 扩搜：medium
+bash run_full_pipeline.sh rq3-expanded medium
+
+# RQ3 扩搜：heavy
+bash run_full_pipeline.sh rq3-expanded heavy
+
+# RQ3 扩搜：extreme
+bash run_full_pipeline.sh rq3-expanded extreme
+```
+
+## 终端进度
+
+`RQ3` 与 `RQ4` 的长任务会在终端打印：
+
+- `elapsed=`：已耗时
+- `eta=`：阶段 ETA
+- `done=x/y`：当前进度
+- `feasible=` 或 `station_feasible=` / `aggregate_feasible=`：当前可行数
 
 ## 使用建议
 

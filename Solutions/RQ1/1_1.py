@@ -46,7 +46,9 @@ def main() -> None:
             "population_by_year": "1_1_high_precision_population_by_year.csv",
             "year5_population": "1_1_high_precision_year5_population.csv",
             "theoretical_demand": "1_2_high_precision_theoretical_demand.csv",
+            "theoretical_demand_detail": "1_2_high_precision_theoretical_demand_detail.csv",
             "adjusted_demand": "1_3_high_precision_adjusted_demand.csv",
+            "adjusted_demand_detail": "1_3_high_precision_adjusted_demand_detail.csv",
         },
     }
     metadata_output_path.write_text(

@@ -303,7 +303,7 @@ def compute_scenario_diagnostics(evaluations: List, threshold: float = 0.6) -> D
 
 
 def load_main_pareto_stats() -> Dict[str, int]:
-    path = OUTPUT_DIR / "3_1_pareto_frontier.csv"
+    path = OUTPUT_DIR / "3_1_aux_pareto_frontier.csv"
     if not path.exists():
         return {"count": 0, "converged_count": 0, "non_converged_count": 0}
     rows = list(csv.DictReader(path.open(encoding="utf-8-sig")))

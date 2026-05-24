@@ -1,4 +1,0 @@
-﻿subsidy_policy,frontier_point_count,converged_point_count,frontier_profit_rate_max,frontier_avg_access_max,frontier_min_access_max,frontier_gini_min,frontier_theil_min
-targeted_subsidy_0.0,7,1,0.218002,0.756593,0.050372,0.269215,0.075914
-targeted_subsidy_1.0,2,0,0.221152,0.747534,0.03877,0.289993,0.087227
-targeted_subsidy_2.0,2,0,0.224452,0.738153,0.026887,0.312022,0.101819

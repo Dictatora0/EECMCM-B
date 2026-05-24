@@ -1,6 +1,0 @@
-﻿representative_label,source,duplicate_of,subsidy_policy,price_scheme_detail,pareto_rank,profit_rate,annual_net_profit_wan,average_service_access_performance,minimum_service_access_performance,gini_access,theil_access,max_min_gap,profit_compliant,fair_satisfaction_compliant,converged
-frontier_profit_peak,pareto_frontier,,targeted_subsidy_2.0,C:alpha=1.0;E:alpha=1.0;G:alpha=1.0;I:alpha=1.0;J:alpha=2.0,1,0.224452,725.42,0.616661,0.0,0.512938,0.220888,0.88,0,0,0
-frontier_fairness_peak,pareto_frontier,,targeted_subsidy_0.0,C:alpha=1.0;E:alpha=1.0;G:alpha=1.0;I:alpha=1.0;J:alpha=1.1,1,0.051008,200.0,0.756593,0.050372,0.269215,0.075914,0.831112,0,0,0
-frontier_converged_reference,pareto_frontier,,targeted_subsidy_0.0,C:alpha=1.0;E:alpha=1.0;G:alpha=1.0;I:alpha=1.0;J:alpha=2.0,1,0.218002,697.26,0.62573,0.0,0.501866,0.208067,0.88,0,0,1
-financial_sustainable_scheme,dual_scheme_output,,targeted_subsidy_1.0,C:alpha=1.0;E:alpha=1.0;G:alpha=1.0;I:alpha=1.0;J:alpha=1.2,2,0.026648,90.35,0.627746,0.0,0.507888,0.214232,0.88,1,0,0
-fairness_priority_scheme,dual_scheme_output,frontier_fairness_peak,targeted_subsidy_0.0,C:alpha=1.0;E:alpha=1.0;G:alpha=1.0;I:alpha=1.0;J:alpha=1.1,1,0.051008,200.0,0.756593,0.050372,0.269215,0.075914,0.831112,0,0,0

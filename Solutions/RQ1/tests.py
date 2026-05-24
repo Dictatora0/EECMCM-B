@@ -2,9 +2,13 @@ from common import (
     CARE_LEVEL_ORDER,
     CommunityRecord,
     SERVICE_ORDER,
+    apply_population_transition,
     aggregate_adjusted_demand,
+    aggregate_population_metrics,
     affordability_adjusted_demand,
+    population_transition_matrix,
     project_elderly_population,
+    project_elderly_population_matrix,
     theoretical_monthly_demand,
 )
 
@@ -62,6 +66,26 @@ def test_emergency_service_is_not_scaled() -> None:
     assert emergency_rows[0]["adjusted_per_person"] == emergency_rows[0]["theoretical_per_person"] == 2
 
 
+def test_theoretical_demand_preserves_detail_fields_for_type_split() -> None:
+    year5_population = [
+        {
+            "community": "T",
+            "self_care": 10.0,
+            "semi_disabled": 5.0,
+            "disabled": 2.0,
+        }
+    ]
+    service_demand = {
+        "自理": {service: 1.0 for service in SERVICE_ORDER},
+        "半失能": {service: 2.0 for service in SERVICE_ORDER},
+        "失能": {service: 3.0 for service in SERVICE_ORDER},
+    }
+    rows = theoretical_monthly_demand(year5_population, service_demand)
+    assert all("theoretical_monthly_demand" in row for row in rows)
+    assert all("care_level" in row for row in rows), "RQ1.2 must retain type-split output"
+    assert len(rows) == len(CARE_LEVEL_ORDER) * len(SERVICE_ORDER)
+
+
 def test_summary_shapes_match_problem_one_outputs() -> None:
     year5_population = [
         {"community": f"C{i}", "self_care": 10.0, "semi_disabled": 5.0, "disabled": 2.0}
@@ -72,7 +96,7 @@ def test_summary_shapes_match_problem_one_outputs() -> None:
         for level in CARE_LEVEL_ORDER
     }
     demand = theoretical_monthly_demand(year5_population, service_demand)
-    assert len(demand) == 10 * len(SERVICE_ORDER)
+    assert len(demand) == 10 * len(CARE_LEVEL_ORDER) * len(SERVICE_ORDER)
 
     adjusted_rows = []
     for i in range(10):
@@ -92,11 +116,54 @@ def test_summary_shapes_match_problem_one_outputs() -> None:
     assert len(summary) == 10 * len(SERVICE_ORDER)
 
 
+def test_transition_matrix_respects_one_way_state_flow() -> None:
+    transition = {"自理->半失能": 0.045, "半失能->失能": 0.10}
+    matrix = population_transition_matrix(transition)
+    assert matrix[2][0] == 0.0
+    assert matrix[1][2] == 0.0
+    assert matrix[2][2] > 0.0
+
+
+def test_matrix_projection_matches_recursive_projection() -> None:
+    communities = [
+        CommunityRecord(
+            community="T",
+            total_population=1000,
+            elderly_population=100,
+            self_care=70,
+            semi_disabled=20,
+            disabled=10,
+            monthly_income=3000,
+        )
+    ]
+    transition = {"自理->半失能": 0.045, "半失能->失能": 0.10}
+    recursive = project_elderly_population(communities, transition, years=3)
+    matrix = project_elderly_population_matrix(communities, transition, years=3)
+    assert len(recursive) == len(matrix)
+    for left, right in zip(recursive, matrix):
+        for field in ("self_care", "semi_disabled", "disabled", "elderly_total", "new_entrants"):
+            assert abs(float(left[field]) - float(right[field])) < 1e-8
+
+
+def test_aggregate_population_metrics_tracks_disabled_share() -> None:
+    rows = [
+        {"year": 5, "community": "A", "self_care": 50.0, "semi_disabled": 30.0, "disabled": 20.0, "elderly_total": 100.0},
+        {"year": 5, "community": "B", "self_care": 60.0, "semi_disabled": 20.0, "disabled": 20.0, "elderly_total": 100.0},
+    ]
+    metrics = aggregate_population_metrics(rows, year=5)
+    assert abs(metrics["elderly_total"] - 200.0) < 1e-9
+    assert abs(metrics["disabled_share"] - 0.2) < 1e-9
+
+
 def run_all_tests() -> None:
     tests = [
         test_new_entrants_are_based_on_elderly_population,
         test_emergency_service_is_not_scaled,
+        test_theoretical_demand_preserves_detail_fields_for_type_split,
         test_summary_shapes_match_problem_one_outputs,
+        test_transition_matrix_respects_one_way_state_flow,
+        test_matrix_projection_matches_recursive_projection,
+        test_aggregate_population_metrics_tracks_disabled_share,
     ]
     for test in tests:
         test()

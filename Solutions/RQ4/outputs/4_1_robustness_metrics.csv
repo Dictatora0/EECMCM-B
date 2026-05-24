@@ -1,5 +1,0 @@
-﻿scenario,RS_loc,RS_layout,geographic_population_coverage_stability,served_population_coverage_stability,weighted_served_population_coverage_stability,served_demand_coverage_stability,q2_service_access_performance_stability,q3_financial_scheme_performance_stability,q3_fairness_scheme_performance_stability,financial_compliance_rate,capacity_safety_rate,max_station_utilization,fully_safe
-S1,1.0,1.0,1.0,1.0,0.966936,0.967851,0.968139,0.984488,0.971912,1.0,0.0,1.0,0
-S2,1.0,1.0,1.0,1.0,0.985554,0.986546,0.986544,0.993236,0.989158,1.0,0.0,1.0,0
-S3,1.0,1.0,1.0,1.0,1.0,1.0,1.0,0.997984,1.0,0.0,0.0,1.0,0
-S4,0.5,0.166667,1.0,0.851981,0.855457,0.864864,0.869599,0.780121,0.891644,1.0,0.25,1.0,0

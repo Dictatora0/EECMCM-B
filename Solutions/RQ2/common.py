@@ -805,13 +805,7 @@ def allocate_with_response_scores(
     response_by_station: Dict[str, float],
     service_costs: Dict[str, Dict[str, float]],
 ) -> Tuple[List[CommunityAllocation], List[StationMetrics], Dict[str, float]]:
-    station_map = {station.community: station for station in stations}
-    remaining_capacity = {station.community: station.daily_capacity for station in stations}
-    primary_monthly_by_station = {
-        station.community: {service: 0.0 for service in SERVICE_ORDER}
-        for station in stations
-    }
-    overflow_monthly_by_station = {
+    raw_monthly_by_station = {
         station.community: {service: 0.0 for service in SERVICE_ORDER}
         for station in stations
     }
@@ -819,23 +813,18 @@ def allocate_with_response_scores(
         station.community: {service: 0.0 for service in SERVICE_ORDER}
         for station in stations
     }
-    raw_monthly_by_station = {
-        station.community: {service: 0.0 for service in SERVICE_ORDER}
+    station_load_by_community: Dict[str, List[tuple[CommunityDemand, Dict[str, float], float, float, float]]] = {
+        station.community: []
         for station in stations
     }
-
     allocations: List[CommunityAllocation] = []
-    ordered_communities = sorted(
-        communities,
-        key=lambda item: (-community_total_daily_demand(item), -item.elderly_population, item.community),
-    )
 
-    for item in ordered_communities:
-        monthly_demand = item.adjusted_monthly_demand
-        daily_demand = {service: monthly_demand[service] / DAYS_PER_MONTH for service in SERVICE_ORDER}
+    for item in sorted(communities, key=lambda row: row.community):
+        daily_demand = {
+            service: item.adjusted_monthly_demand[service] / DAYS_PER_MONTH
+            for service in SERVICE_ORDER
+        }
         total_daily = sum(daily_demand.values())
-        emergency_daily = daily_demand["紧急救助"]
-
         reachable = rank_reachable_stations(
             community=item.community,
             stations=stations,
@@ -857,12 +846,12 @@ def allocate_with_response_scores(
                     effective_person_times_daily=0.0,
                     primary_load=0.0,
                     overflow_load=0.0,
-                    unmet_load=community_total_daily_demand(item),
+                    unmet_load=total_daily,
                     geographic_satisfaction=0.0,
                     response_satisfaction=0.0,
                     price_satisfaction=0.0,
                     service_satisfaction=0.0,
-                    adjusted_demand_daily=community_total_daily_demand(item),
+                    adjusted_demand_daily=total_daily,
                     demand_service_ratio=0.0,
                     service_access_performance=0.0,
                     elderly_population=item.elderly_population,
@@ -872,130 +861,78 @@ def allocate_with_response_scores(
 
         primary_name = choose_primary_station(
             reachable=reachable,
-            remaining_capacity=remaining_capacity,
+            remaining_capacity={station.community: station.daily_capacity for station in stations},
             total_daily_demand=total_daily,
-            emergency_daily_demand=emergency_daily,
+            emergency_daily_demand=daily_demand["紧急救助"],
         )
-        primary_record = next(item for item in reachable if item[0] == primary_name)
-        _, primary_distance, primary_distance_sat, base_primary_score = primary_record
-        overflow_name = choose_overflow_station(
-            reachable=reachable,
-            primary_name=primary_name,
-            remaining_capacity=remaining_capacity,
+        primary_record = next(record for record in reachable if record[0] == primary_name)
+        _, _distance, primary_distance_sat, base_primary_score = primary_record
+        station_load_by_community[primary_name].append(
+            (
+                item,
+                daily_demand,
+                total_daily,
+                primary_distance_sat,
+                clamp_service_satisfaction(base_primary_score),
+            )
         )
 
-        primary_assigned_daily = 0.0
-        overflow_assigned_daily = 0.0
-        unmet_daily = 0.0
-
-        remaining_primary = remaining_capacity[primary_name]
-        emergency_primary_daily = min(emergency_daily, remaining_primary)
-        remaining_primary -= emergency_primary_daily
-        primary_assigned_daily += emergency_primary_daily
-        unmet_daily += emergency_daily - emergency_primary_daily
-        primary_monthly_by_station[primary_name]["紧急救助"] += emergency_primary_daily * DAYS_PER_MONTH
-
-        movable_total_daily = sum(daily_demand[service] for service in MOVABLE_SERVICES)
-        movable_primary_ratio = min(1.0, remaining_primary / movable_total_daily) if movable_total_daily > 0 else 0.0
-        movable_primary_daily = movable_total_daily * movable_primary_ratio
-        remaining_primary -= movable_primary_daily
-        primary_assigned_daily += movable_primary_daily
-
-        movable_overflow_needed_daily = movable_total_daily - movable_primary_daily
-        movable_overflow_ratio = 0.0
-        if overflow_name is not None and movable_overflow_needed_daily > 0:
-            remaining_overflow = remaining_capacity[overflow_name]
-            movable_overflow_ratio = min(1.0, remaining_overflow / movable_overflow_needed_daily)
-            movable_overflow_daily = movable_overflow_needed_daily * movable_overflow_ratio
-            remaining_capacity[overflow_name] = remaining_overflow - movable_overflow_daily
-            overflow_assigned_daily += movable_overflow_daily
-            unmet_daily += movable_overflow_needed_daily - movable_overflow_daily
+    station_capacity_ratio: Dict[str, float] = {}
+    for station in stations:
+        grouped = station_load_by_community[station.community]
+        total_station_daily = sum(total_daily for _item, _daily_demand, total_daily, _dist, _score in grouped)
+        if total_station_daily <= 1e-12:
+            station_capacity_ratio[station.community] = 0.0
         else:
-            unmet_daily += movable_overflow_needed_daily
+            station_capacity_ratio[station.community] = min(1.0, station.daily_capacity / total_station_daily)
 
-        remaining_capacity[primary_name] = remaining_primary
-
-        for service in MOVABLE_SERVICES:
-            service_daily = daily_demand[service]
-            primary_service_daily = service_daily * movable_primary_ratio
-            primary_monthly_by_station[primary_name][service] += primary_service_daily * DAYS_PER_MONTH
-
-            leftover_daily = service_daily - primary_service_daily
-            overflow_service_daily = leftover_daily * movable_overflow_ratio
-            if overflow_name is not None:
-                overflow_monthly_by_station[overflow_name][service] += overflow_service_daily * DAYS_PER_MONTH
-
-        response_score = response_by_station[primary_name]
-        raw_served_daily = primary_assigned_daily + overflow_assigned_daily
-        actually_served = int(raw_served_daily > 1e-12)
-        primary_service_satisfaction = clamp_service_satisfaction(base_primary_score)
-        overflow_service_satisfaction = clamp_service_satisfaction(base_primary_score - OVERFLOW_PENALTY)
-        service_satisfaction = 0.0
-        if actually_served:
-            service_satisfaction = (
-                primary_assigned_daily * primary_service_satisfaction
-                + overflow_assigned_daily * overflow_service_satisfaction
-            ) / raw_served_daily
-        service_metrics = compute_service_metrics(
-            raw_served_demand_daily=raw_served_daily,
-            adjusted_demand_daily=total_daily,
-            service_satisfaction=service_satisfaction,
-        )
-
-        primary_increment = {
-            service: daily_demand[service] * DAYS_PER_MONTH * (
-                movable_primary_ratio if service in MOVABLE_SERVICES else emergency_primary_daily / emergency_daily if service == "紧急救助" and emergency_daily > 0 else 0.0
-            )
-            for service in SERVICE_ORDER
-        }
-        for service, value in primary_increment.items():
-            raw_monthly_by_station[primary_name][service] += value
-            effective_monthly_by_station[primary_name][service] += value * primary_service_satisfaction
-        if overflow_name is not None:
-            overflow_increment = {
-                service: (daily_demand[service] - daily_demand[service] * movable_primary_ratio) * DAYS_PER_MONTH * movable_overflow_ratio
-                if service in MOVABLE_SERVICES
-                else 0.0
-                for service in SERVICE_ORDER
-            }
-            for service, value in overflow_increment.items():
-                raw_monthly_by_station[overflow_name][service] += value
-                effective_monthly_by_station[overflow_name][service] += value * overflow_service_satisfaction
-
-        allocations.append(
-            CommunityAllocation(
-                community=item.community,
-                primary_station=primary_name,
-                overflow_station=overflow_name if overflow_assigned_daily > 0 else None,
-                geographic_reachable=1,
-                actually_served=actually_served,
-                geographic_population_covered=item.elderly_population,
-                served_population_covered=item.elderly_population if actually_served else 0.0,
+    for station in stations:
+        ratio = station_capacity_ratio[station.community]
+        for item, daily_demand, total_daily, primary_distance_sat, service_satisfaction in station_load_by_community[station.community]:
+            raw_served_daily = total_daily * ratio
+            unmet_daily = total_daily - raw_served_daily
+            service_metrics = compute_service_metrics(
                 raw_served_demand_daily=raw_served_daily,
-                effective_person_times_daily=service_metrics["effective_person_times_daily"],
-                primary_load=primary_assigned_daily,
-                overflow_load=overflow_assigned_daily,
-                unmet_load=unmet_daily,
-                geographic_satisfaction=primary_distance_sat,
-                response_satisfaction=response_score,
-                price_satisfaction=BASE_PRICE_SATISFACTION,
-                service_satisfaction=service_satisfaction,
                 adjusted_demand_daily=total_daily,
-                demand_service_ratio=service_metrics["demand_service_ratio"],
-                service_access_performance=service_metrics["service_access_performance"],
-                elderly_population=item.elderly_population,
+                service_satisfaction=service_satisfaction if raw_served_daily > 1e-12 else 0.0,
             )
-        )
+            for service in SERVICE_ORDER:
+                served_service_daily = daily_demand[service] * ratio
+                served_service_monthly = served_service_daily * DAYS_PER_MONTH
+                raw_monthly_by_station[station.community][service] += served_service_monthly
+                effective_monthly_by_station[station.community][service] += served_service_monthly * service_satisfaction
+            allocations.append(
+                CommunityAllocation(
+                    community=item.community,
+                    primary_station=station.community,
+                    overflow_station=None,
+                    geographic_reachable=1,
+                    actually_served=int(raw_served_daily > 1e-12),
+                    geographic_population_covered=item.elderly_population,
+                    served_population_covered=item.elderly_population * ratio,
+                    raw_served_demand_daily=raw_served_daily,
+                    effective_person_times_daily=service_metrics["effective_person_times_daily"],
+                    primary_load=raw_served_daily,
+                    overflow_load=0.0,
+                    unmet_load=unmet_daily,
+                    geographic_satisfaction=primary_distance_sat,
+                    response_satisfaction=response_by_station[station.community],
+                    price_satisfaction=BASE_PRICE_SATISFACTION,
+                    service_satisfaction=service_satisfaction if raw_served_daily > 1e-12 else 0.0,
+                    adjusted_demand_daily=total_daily,
+                    demand_service_ratio=service_metrics["demand_service_ratio"],
+                    service_access_performance=service_metrics["service_access_performance"],
+                    elderly_population=item.elderly_population,
+                )
+            )
 
     station_metrics: List[StationMetrics] = []
     next_response: Dict[str, float] = {}
     for station in stations:
-        primary_load = sum(primary_monthly_by_station[station.community].values()) / DAYS_PER_MONTH
-        overflow_load = sum(overflow_monthly_by_station[station.community].values()) / DAYS_PER_MONTH
-        total_load = primary_load + overflow_load
+        primary_load = sum(raw_monthly_by_station[station.community].values()) / DAYS_PER_MONTH
+        total_load = primary_load
         utilization = total_load / station.daily_capacity if station.daily_capacity > 0 else 0.0
         next_response[station.community] = response_satisfaction(utilization, response_rules)
-
         raw_daily_by_service = {
             service: raw_monthly_by_station[station.community][service] / DAYS_PER_MONTH
             for service in SERVICE_ORDER
@@ -1018,7 +955,7 @@ def allocate_with_response_scores(
                 scale=station.scale,
                 daily_capacity=station.daily_capacity,
                 assigned_primary_load=primary_load,
-                assigned_overflow_load=overflow_load,
+                assigned_overflow_load=0.0,
                 total_load=total_load,
                 utilization=utilization,
                 annual_service_revenue=financials["annual_revenue"],

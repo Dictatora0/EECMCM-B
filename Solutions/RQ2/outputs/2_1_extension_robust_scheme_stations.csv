@@ -1,0 +1,6 @@
+﻿station_community,scale,daily_capacity,assigned_primary_load,assigned_overflow_load,total_load,utilization,annual_service_revenue,annual_revenue,annual_subsidy,annual_direct_cost,annual_fixed_cost,annual_depreciation,annual_government_subsidy_baseline,annual_total_cost,annual_net_profit_before_subsidy,annual_net_profit_after_policy_subsidy,annual_net_profit,profit_rate,profit_compliant
+C,小型,1000.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,730000.0,9000.0,0.0,739000.0,-739000.0,-739000.0,-739000.0,-1.0,0
+E,小型,1000.0,1000.0,0.0,1000.0,1.0,5920947.05,5920947.05,365000.0,4855233.21,730000.0,9000.0,365000.0,5594233.21,326713.85,691713.85,691713.85,0.123648,0
+G,小型,1000.0,1000.0,0.0,1000.0,1.0,5924273.69,5924273.69,365000.0,4885235.22,730000.0,9000.0,365000.0,5624235.22,300038.47,665038.47,665038.47,0.118245,0
+I,小型,1000.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,730000.0,9000.0,0.0,739000.0,-739000.0,-739000.0,-739000.0,-1.0,0
+J,大型,3000.0,3000.0,0.0,3000.0,1.0,17734678.5,17734678.5,949000.0,14562447.29,1606000.0,22500.0,949000.0,16190947.29,1543731.21,2492731.21,2492731.21,0.153958,0

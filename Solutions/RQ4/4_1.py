@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from pathlib import Path
 import random
+import time
 
 from common import (
     BASELINE_PARAMETERS,
@@ -41,6 +42,28 @@ _BASELINE_SCHEME_CODES: list[tuple[int, ...]] | None = None
 MONTE_CARLO_SEED = 20260523
 MONTE_CARLO_SAMPLES = 24
 RQ4_MAX_Q3_CANDIDATE_PROFILES = 60
+RQ4_Q2_PROGRESS_INTERVAL = 100
+
+
+def progress_print(message: str) -> None:
+    print(f"[RQ4] {message}", flush=True)
+
+
+def format_elapsed(seconds: float) -> str:
+    total = max(0, int(seconds))
+    minutes, sec = divmod(total, 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours > 0:
+        return f"{hours:02d}:{minutes:02d}:{sec:02d}"
+    return f"{minutes:02d}:{sec:02d}"
+
+
+def format_eta(start_time: float, done: int, total: int) -> str:
+    if done <= 0 or total <= 0 or done > total:
+        return "--:--"
+    elapsed = max(0.0, time.time() - start_time)
+    remaining = elapsed * (total - done) / max(done, 1)
+    return format_elapsed(remaining)
 
 
 def load_baseline_rq1_inputs():
@@ -148,6 +171,7 @@ def solve_rq2_under_scenario(
     year5_population_rows: list[dict[str, float]],
     adjusted_summary_rows: list[dict[str, float]],
 ) -> tuple[object, object, int]:
+    stage_start = time.time()
     scales = RQ2_COMMON.load_station_scales()
     distance_matrix = RQ2_COMMON.load_distance_matrix()
     satisfaction_rules = RQ2_COMMON.load_satisfaction_rules()
@@ -187,9 +211,14 @@ def solve_rq2_under_scenario(
         budget_limit=params["budget_limit"],
         reuse_baseline=reuse_baseline_codes,
     )
+    progress_print(
+        f"{scenario.code} | Q2 start | elapsed={format_elapsed(0)} | eta=--:-- "
+        f"| budget={params['budget_limit']} | fixed_cost_multiplier={params['fixed_cost_multiplier']} "
+        f"| candidate_scheme_count={len(scheme_codes)}."
+    )
 
     evaluations = []
-    for scheme_code in scheme_codes:
+    for idx, scheme_code in enumerate(scheme_codes, start=1):
         result = RQ2_COMMON.evaluate_scheme(
             scheme_code=scheme_code,
             communities=communities,
@@ -201,6 +230,12 @@ def solve_rq2_under_scenario(
         )
         if result is not None:
             evaluations.append(result)
+        if idx % RQ4_Q2_PROGRESS_INTERVAL == 0 or idx == len(scheme_codes):
+            progress_print(
+                f"{scenario.code} | Q2 progress | elapsed={format_elapsed(time.time() - stage_start)} "
+                f"| eta={format_eta(stage_start, idx, len(scheme_codes))} | done={idx}/{len(scheme_codes)} "
+                f"| feasible={len(evaluations)}."
+            )
 
     baseline_ranked = RQ2_COMMON.sort_scheme_evaluations(evaluations)
     baseline_best = baseline_ranked[0]
@@ -213,6 +248,9 @@ def solve_rq2_under_scenario(
         budget_limit=params["budget_limit"],
         fairness_weight=0.25,
         safety_capacity_factor=0.85,
+    )
+    progress_print(
+        f"{scenario.code} | Q2 MILP solved | elapsed={format_elapsed(time.time() - stage_start)} | eta=--:--."
     )
     if optimized_scheme_code is not None:
         best = RQ2_COMMON.evaluate_scheme(
@@ -230,6 +268,11 @@ def solve_rq2_under_scenario(
     best.feasible_scheme_count = len(evaluations)
     safe_best.scenario_budget_limit = params["budget_limit"]
     safe_best.feasible_scheme_count = len(evaluations)
+    progress_print(
+        f"{scenario.code} | Q2 done | elapsed={format_elapsed(time.time() - stage_start)} | eta=00:00 "
+        f"| feasible={len(evaluations)} | "
+        f"best_plan={build_station_plan_text({station.community: station.scale for station in best.stations})}."
+    )
     return best, safe_best, len(evaluations)
 
 
@@ -377,8 +420,12 @@ def build_rq3_inputs(
 
 
 def solve_rq3_under_scenario(rq3_inputs) -> tuple[object, object, bool]:
+    stage_start = time.time()
     candidate_profiles = RQ3_MAIN.enumerate_station_price_profiles(rq3_inputs)
     candidate_profiles = candidate_profiles[:RQ4_MAX_Q3_CANDIDATE_PROFILES]
+    progress_print(
+        f"Q3 start | elapsed={format_elapsed(0)} | eta=--:-- | primary_candidate_profiles={len(candidate_profiles)}."
+    )
     warm_start = {row.community: row.service_satisfaction for row in rq3_inputs.q2_allocations}
     primary_evaluations = RQ3_MAIN.evaluate_candidate_profiles(
         rq3_inputs,
@@ -389,6 +436,10 @@ def solve_rq3_under_scenario(rq3_inputs) -> tuple[object, object, bool]:
     rescue_evaluations = []
     if ranked_primary and ranked_primary[0].profit_compliant == 0:
         rescue_candidates = RQ3_MAIN.generate_rescue_price_profiles(rq3_inputs, ranked_primary)
+        progress_print(
+            f"Q3 rescue start | elapsed={format_elapsed(time.time() - stage_start)} | eta=--:-- "
+            f"| rescue_candidates={len(rescue_candidates)}."
+        )
         for candidate in rescue_candidates:
             rescue_evaluations.append(
                 RQ3_MAIN.evaluate_price_profile(
@@ -400,9 +451,14 @@ def solve_rq3_under_scenario(rq3_inputs) -> tuple[object, object, bool]:
                 )
             )
     all_evaluations = primary_evaluations + rescue_evaluations
+    progress_print(
+        f"Q3 done | elapsed={format_elapsed(time.time() - stage_start)} | eta=00:00 "
+        f"| primary={len(primary_evaluations)} | rescue={len(rescue_evaluations)} | total={len(all_evaluations)} "
+        f"| joint_feasible={int(RQ3_MAIN.joint_feasible_solution_exists(all_evaluations))}."
+    )
     return (
         RQ3_MAIN.select_financial_best(all_evaluations),
-        RQ3_MAIN.select_fairness_best(all_evaluations),
+        RQ3_MAIN.select_satisfaction_best(all_evaluations),
         RQ3_MAIN.joint_feasible_solution_exists(all_evaluations),
     )
 
@@ -450,7 +506,7 @@ def solve_scenario(
         adjusted_summary_rows=adjusted_summary_rows,
         adjusted_detail_rows=adjusted_detail_rows,
     )
-    financial_best, fairness_best, joint_feasible = solve_rq3_under_scenario(rq3_inputs)
+    financial_best, satisfaction_best, joint_feasible = solve_rq3_under_scenario(rq3_inputs)
     params = scenario_parameter_dict(scenario)
 
     q2_best_summary = RQ2_MAIN.evaluation_to_summary_row(q2_best)
@@ -458,9 +514,9 @@ def solve_scenario(
     q2_best_station_plan = q2_best_summary["scheme_detail"]
     q2_safe_station_plan = q2_safe_summary["scheme_detail"]
     financial_summary = RQ3_MAIN.evaluation_summary_row(financial_best)
-    fairness_summary = RQ3_MAIN.evaluation_summary_row(fairness_best)
+    satisfaction_summary = RQ3_MAIN.evaluation_summary_row(satisfaction_best)
 
-    return {
+    result_payload = {
         "cache_version": CACHE_VERSION,
         "scenario": scenario.code,
         "scenario_name": scenario.name,
@@ -477,11 +533,11 @@ def solve_scenario(
         "q2_best_station_utilizations": [float(item.utilization) for item in q2_best.station_metrics],
         "q2_safe_station_utilizations": [float(item.utilization) for item in q2_safe.station_metrics],
         "financial_best_summary": financial_summary,
-        "fairness_best_summary": fairness_summary,
+        "satisfaction_best_summary": satisfaction_summary,
         "financial_best_station_financials": financial_best.station_financials,
-        "fairness_best_station_financials": fairness_best.station_financials,
+        "satisfaction_best_station_financials": satisfaction_best.station_financials,
         "financial_best_community_results": community_results_rows(financial_best),
-        "fairness_best_community_results": community_results_rows(fairness_best),
+        "satisfaction_best_community_results": community_results_rows(satisfaction_best),
         "joint_feasible_solution_exists": bool(joint_feasible),
         "joint_feasible_summary": (
             "存在同时满足财务合规、公平可及阈值与收敛要求的方案。"
@@ -490,10 +546,59 @@ def solve_scenario(
         ),
         "coordination_note": "老人仍选择满意度最高的主服务站。容量不足时，协同站点分流表示由主站或街道平台进行派单协同，不表示老人自主改选其他站点。",
     }
+    add_legacy_fairness_summary_keys(
+        result_payload,
+        satisfaction_summary=satisfaction_summary,
+        satisfaction_station_financials=satisfaction_best.station_financials,
+        satisfaction_community_results=community_results_rows(satisfaction_best),
+    )
+    return result_payload
 
 
 def cache_path_for_scenario(code: str) -> Path:
     return CACHE_DIR / f"{code}.json"
+
+
+def add_legacy_fairness_summary_keys(
+    payload: dict[str, object],
+    satisfaction_summary: dict[str, object],
+    satisfaction_station_financials: list[dict[str, object]],
+    satisfaction_community_results: list[dict[str, object]],
+) -> None:
+    payload["fairness_best_summary"] = satisfaction_summary
+    payload["fairness_best_station_financials"] = satisfaction_station_financials
+    payload["fairness_best_community_results"] = satisfaction_community_results
+
+
+def build_legacy_fairness_unified_fields(
+    satisfaction_summary: dict[str, object],
+) -> dict[str, object]:
+    return {
+        "fairness_subsidy_policy": satisfaction_summary["subsidy_policy"],
+        "fairness_pareto_rank": satisfaction_summary["pareto_rank"],
+        "fairness_annual_government_subsidy": satisfaction_summary["annual_government_subsidy"],
+        "fairness_annual_net_profit": satisfaction_summary["annual_net_profit"],
+        "fairness_profit_rate": satisfaction_summary["profit_rate"],
+        "fairness_average_service_access_performance": satisfaction_summary["average_service_access_performance"],
+        "fairness_minimum_service_access_performance": satisfaction_summary["minimum_service_access_performance"],
+        "fairness_profit_compliant": satisfaction_summary["profit_compliant"],
+        "fairness_converged": satisfaction_summary["converged"],
+    }
+
+
+def add_legacy_q3_scheme_row_fields(row: dict[str, object]) -> dict[str, object]:
+    normalized = dict(row)
+    if normalized.get("scheme_type") == "satisfaction_priority_scheme":
+        normalized["scheme_type"] = "fairness_priority_scheme"
+    if "q3_satisfaction_minimum_service_access_performance" in normalized:
+        normalized["q3_fairness_minimum_service_access_performance"] = normalized[
+            "q3_satisfaction_minimum_service_access_performance"
+        ]
+    if "q3_satisfaction_scheme_performance_stability" in normalized:
+        normalized["q3_fairness_scheme_performance_stability"] = normalized[
+            "q3_satisfaction_scheme_performance_stability"
+        ]
+    return normalized
 
 
 def cache_is_current(path: Path) -> bool:
@@ -513,11 +618,21 @@ def solve_and_cache_scenarios(scenarios: list[ScenarioDefinition]) -> dict[str, 
     baseline_adjusted_detail_rows = adjusted_detail_records_to_rows(baseline_adjusted_detail)
 
     result_map: dict[str, dict[str, object]] = {}
-    for scenario in scenarios:
+    batch_start = time.time()
+    total = len(scenarios)
+    for idx, scenario in enumerate(scenarios, start=1):
+        progress_print(
+            f"{scenario.code} | scenario start | elapsed={format_elapsed(time.time() - batch_start)} "
+            f"| eta={format_eta(batch_start, idx - 1, total)} | done={idx-1}/{total} "
+            f"| path={scenario_execution_path(scenario)}."
+        )
         path = cache_path_for_scenario(scenario.code)
         if cache_is_current(path):
             result_map[scenario.code] = read_json(path)
-            print(f"Reused cached scenario {scenario.code}.")
+            progress_print(
+                f"{scenario.code} | scenario reused-cache | elapsed={format_elapsed(time.time() - batch_start)} "
+                f"| eta={format_eta(batch_start, idx, total)} | done={idx}/{total}."
+            )
             continue
         result = solve_scenario(
             scenario,
@@ -527,7 +642,10 @@ def solve_and_cache_scenarios(scenarios: list[ScenarioDefinition]) -> dict[str, 
         )
         write_json(path, result)
         result_map[scenario.code] = result
-        print(f"Solved scenario {scenario.code} and wrote cache.")
+        progress_print(
+            f"{scenario.code} | scenario done | elapsed={format_elapsed(time.time() - batch_start)} "
+            f"| eta={format_eta(batch_start, idx, total)} | done={idx}/{total}."
+        )
     return result_map
 
 
@@ -566,46 +684,56 @@ def build_q3_summary_rows(scenarios: list[ScenarioDefinition], result_map: dict[
     for scenario in scenarios:
         result = result_map[scenario.code]
         rows.append(
-            {
-                "scenario": scenario.code,
-                "budget_limit": result["scenario_parameters"]["budget_limit"],
-                "fixed_cost_multiplier": result["scenario_parameters"]["fixed_cost_multiplier"],
-                "p12": result["scenario_parameters"]["p12"],
-                "p23": result["scenario_parameters"]["p23"],
-                "elderly_growth_rate": result["scenario_parameters"]["elderly_growth_rate"],
-                "scheme_type": "financial_sustainable_scheme",
-                "station_plan": result["q2_best_station_plan"],
-                "average_service_access_performance": result["financial_best_summary"]["average_service_access_performance"],
-                "minimum_service_access_performance": result["financial_best_summary"]["minimum_service_access_performance"],
-                "annual_government_subsidy": result["financial_best_summary"]["annual_government_subsidy"],
-                "annual_net_profit": result["financial_best_summary"]["annual_net_profit"],
-                "profit_rate": result["financial_best_summary"]["profit_rate"],
-                "profit_compliant": result["financial_best_summary"]["profit_compliant"],
-                "converged": result["financial_best_summary"]["converged"],
-                "iterations": result["financial_best_summary"]["iterations"],
-                "fiscal_gap_if_any": round(RQ3_MAIN.financial_gap_to_break_even_from_summary(result["financial_best_summary"]) if hasattr(RQ3_MAIN, "financial_gap_to_break_even_from_summary") else max(0.0, -float(result["financial_best_summary"]["annual_net_profit"])), 2),
-            }
+            add_legacy_q3_scheme_row_fields(
+                {
+                    "scenario": scenario.code,
+                    "budget_limit": result["scenario_parameters"]["budget_limit"],
+                    "fixed_cost_multiplier": result["scenario_parameters"]["fixed_cost_multiplier"],
+                    "p12": result["scenario_parameters"]["p12"],
+                    "p23": result["scenario_parameters"]["p23"],
+                    "elderly_growth_rate": result["scenario_parameters"]["elderly_growth_rate"],
+                    "scheme_type": "financial_sustainable_scheme",
+                    "station_plan": result["q2_best_station_plan"],
+                    "served_population_coverage": result["financial_best_summary"]["served_population_coverage"],
+                    "weighted_served_population_coverage": result["financial_best_summary"]["weighted_served_population_coverage"],
+                    "served_demand_coverage": result["financial_best_summary"]["served_demand_coverage"],
+                    "average_service_access_performance": result["financial_best_summary"]["average_service_access_performance"],
+                    "minimum_service_access_performance": result["financial_best_summary"]["minimum_service_access_performance"],
+                    "annual_government_subsidy": result["financial_best_summary"]["annual_government_subsidy"],
+                    "annual_net_profit": result["financial_best_summary"]["annual_net_profit"],
+                    "profit_rate": result["financial_best_summary"]["profit_rate"],
+                    "profit_compliant": result["financial_best_summary"]["profit_compliant"],
+                    "converged": result["financial_best_summary"]["converged"],
+                    "iterations": result["financial_best_summary"]["iterations"],
+                    "fiscal_gap_if_any": round(RQ3_MAIN.financial_gap_to_break_even_from_summary(result["financial_best_summary"]) if hasattr(RQ3_MAIN, "financial_gap_to_break_even_from_summary") else max(0.0, -float(result["financial_best_summary"]["annual_net_profit"])), 2),
+                }
+            )
         )
         rows.append(
-            {
-                "scenario": scenario.code,
-                "budget_limit": result["scenario_parameters"]["budget_limit"],
-                "fixed_cost_multiplier": result["scenario_parameters"]["fixed_cost_multiplier"],
-                "p12": result["scenario_parameters"]["p12"],
-                "p23": result["scenario_parameters"]["p23"],
-                "elderly_growth_rate": result["scenario_parameters"]["elderly_growth_rate"],
-                "scheme_type": "fairness_priority_scheme",
-                "station_plan": result["q2_best_station_plan"],
-                "average_service_access_performance": result["fairness_best_summary"]["average_service_access_performance"],
-                "minimum_service_access_performance": result["fairness_best_summary"]["minimum_service_access_performance"],
-                "annual_government_subsidy": result["fairness_best_summary"]["annual_government_subsidy"],
-                "annual_net_profit": result["fairness_best_summary"]["annual_net_profit"],
-                "profit_rate": result["fairness_best_summary"]["profit_rate"],
-                "profit_compliant": result["fairness_best_summary"]["profit_compliant"],
-                "converged": result["fairness_best_summary"]["converged"],
-                "iterations": result["fairness_best_summary"]["iterations"],
-                "fiscal_gap_if_any": round(max(0.0, -float(result["fairness_best_summary"]["annual_net_profit"])), 2),
-            }
+            add_legacy_q3_scheme_row_fields(
+                {
+                    "scenario": scenario.code,
+                    "budget_limit": result["scenario_parameters"]["budget_limit"],
+                    "fixed_cost_multiplier": result["scenario_parameters"]["fixed_cost_multiplier"],
+                    "p12": result["scenario_parameters"]["p12"],
+                    "p23": result["scenario_parameters"]["p23"],
+                    "elderly_growth_rate": result["scenario_parameters"]["elderly_growth_rate"],
+                    "scheme_type": "satisfaction_priority_scheme",
+                    "station_plan": result["q2_best_station_plan"],
+                    "served_population_coverage": result["satisfaction_best_summary"]["served_population_coverage"],
+                    "weighted_served_population_coverage": result["satisfaction_best_summary"]["weighted_served_population_coverage"],
+                    "served_demand_coverage": result["satisfaction_best_summary"]["served_demand_coverage"],
+                    "average_service_access_performance": result["satisfaction_best_summary"]["average_service_access_performance"],
+                    "minimum_service_access_performance": result["satisfaction_best_summary"]["minimum_service_access_performance"],
+                    "annual_government_subsidy": result["satisfaction_best_summary"]["annual_government_subsidy"],
+                    "annual_net_profit": result["satisfaction_best_summary"]["annual_net_profit"],
+                    "profit_rate": result["satisfaction_best_summary"]["profit_rate"],
+                    "profit_compliant": result["satisfaction_best_summary"]["profit_compliant"],
+                    "converged": result["satisfaction_best_summary"]["converged"],
+                    "iterations": result["satisfaction_best_summary"]["iterations"],
+                    "fiscal_gap_if_any": round(max(0.0, -float(result["satisfaction_best_summary"]["annual_net_profit"])), 2),
+                }
+            )
         )
     return rows
 
@@ -618,7 +746,7 @@ def build_sensitivity_rows(scenarios: list[ScenarioDefinition], result_map: dict
         "q2_average_service_access_performance": lambda item: float(item["q2_best_summary"]["average_service_access_performance"]),
         "q3_financial_annual_net_profit": lambda item: float(item["financial_best_summary"]["annual_net_profit"]),
         "q3_financial_profit_rate": lambda item: float(item["financial_best_summary"]["profit_rate"]),
-        "q3_fairness_minimum_service_access_performance": lambda item: float(item["fairness_best_summary"]["minimum_service_access_performance"]),
+        "q3_satisfaction_minimum_service_access_performance": lambda item: float(item["satisfaction_best_summary"]["minimum_service_access_performance"]),
     }
     scenario_map = {item.code: item for item in scenarios}
     for code in sorted(result_map):
@@ -650,7 +778,7 @@ def build_robustness_rows(scenarios: list[ScenarioDefinition], result_map: dict[
         "average_service_access_performance": float(baseline["q2_best_summary"]["average_service_access_performance"]),
     }
     baseline_q3_financial_performance = float(baseline["financial_best_summary"]["average_service_access_performance"])
-    baseline_q3_fairness_performance = float(baseline["fairness_best_summary"]["average_service_access_performance"])
+    baseline_q3_satisfaction_performance = float(baseline["satisfaction_best_summary"]["average_service_access_performance"])
 
     rows = []
     for scenario in scenarios:
@@ -672,8 +800,8 @@ def build_robustness_rows(scenarios: list[ScenarioDefinition], result_map: dict[
                 },
                 baseline_q3_financial_performance=baseline_q3_financial_performance,
                 scenario_q3_financial_performance=float(result["financial_best_summary"]["average_service_access_performance"]),
-                baseline_q3_fairness_performance=baseline_q3_fairness_performance,
-                scenario_q3_fairness_performance=float(result["fairness_best_summary"]["average_service_access_performance"]),
+                baseline_q3_satisfaction_performance=baseline_q3_satisfaction_performance,
+                scenario_q3_satisfaction_performance=float(result["satisfaction_best_summary"]["average_service_access_performance"]),
                 station_profit_flags=[int(row["profit_compliant"]) for row in result["financial_best_station_financials"]],
                 station_utilizations=[float(value) for value in result["q2_best_station_utilizations"]],
             )
@@ -711,7 +839,7 @@ def build_unified_summary_rows(
         parameters = result["scenario_parameters"]
         q2_summary = result["q2_best_summary"]
         financial_summary = result["financial_best_summary"]
-        fairness_summary = result["fairness_best_summary"]
+        satisfaction_summary = result["satisfaction_best_summary"]
         robustness = robustness_by_scenario.get(scenario.code)
         if robustness is None:
             robustness = {
@@ -719,7 +847,7 @@ def build_unified_summary_rows(
                 "RS_layout": 1.0,
                 "served_demand_coverage_stability": 1.0,
                 "q3_financial_scheme_performance_stability": 1.0,
-                "q3_fairness_scheme_performance_stability": 1.0,
+                "q3_satisfaction_scheme_performance_stability": 1.0,
                 "financial_compliance_rate": round(
                     compute_financial_compliance_rate(
                         [int(row["profit_compliant"]) for row in result["financial_best_station_financials"]]
@@ -768,26 +896,18 @@ def build_unified_summary_rows(
                 "financial_minimum_service_access_performance": financial_summary["minimum_service_access_performance"],
                 "financial_profit_compliant": financial_summary["profit_compliant"],
                 "financial_converged": financial_summary["converged"],
-                "fairness_subsidy_policy": fairness_summary["subsidy_policy"],
-                "fairness_pareto_rank": fairness_summary["pareto_rank"],
-                "fairness_annual_government_subsidy": fairness_summary["annual_government_subsidy"],
-                "fairness_annual_net_profit": fairness_summary["annual_net_profit"],
-                "fairness_profit_rate": fairness_summary["profit_rate"],
-                "fairness_average_service_access_performance": fairness_summary["average_service_access_performance"],
-                "fairness_minimum_service_access_performance": fairness_summary["minimum_service_access_performance"],
-                "fairness_profit_compliant": fairness_summary["profit_compliant"],
-                "fairness_converged": fairness_summary["converged"],
                 "joint_feasible_solution_exists": int(result["joint_feasible_solution_exists"]),
                 "RS_loc": robustness["RS_loc"],
                 "RS_layout": robustness["RS_layout"],
                 "served_demand_coverage_stability": robustness["served_demand_coverage_stability"],
                 "q3_financial_scheme_performance_stability": robustness["q3_financial_scheme_performance_stability"],
-                "q3_fairness_scheme_performance_stability": robustness["q3_fairness_scheme_performance_stability"],
+                "q3_satisfaction_scheme_performance_stability": robustness["q3_fairness_scheme_performance_stability"],
                 "financial_compliance_rate": robustness["financial_compliance_rate"],
                 "capacity_safety_rate": robustness["capacity_safety_rate"],
                 "dominant_sensitivity_metric": dominant_sensitivity["metric"],
                 "dominant_sensitivity_coefficient": dominant_sensitivity["sensitivity_coefficient"],
                 "dominant_sensitivity_level": dominant_sensitivity["sensitivity_level"],
+                **build_legacy_fairness_unified_fields(satisfaction_summary),
             }
         )
     return rows
@@ -962,7 +1082,7 @@ def build_monte_carlo_rows(result_map: dict[str, dict[str, object]]) -> list[dic
     baseline = result_map["S0"]
     served_samples = []
     profit_samples = []
-    fairness_samples = []
+    satisfaction_samples = []
     rows = []
     for sample_id in range(1, MONTE_CARLO_SAMPLES + 1):
         params = sample_parameters_for_monte_carlo(rng)
@@ -972,25 +1092,25 @@ def build_monte_carlo_rows(result_map: dict[str, dict[str, object]]) -> list[dic
 
         served = float(baseline["q2_best_summary"]["served_demand_coverage"]) * min(1.0, 0.96 + 0.05 * budget_factor - 0.03 * cost_factor + 0.02 * demand_factor)
         profit = float(baseline["financial_best_summary"]["annual_net_profit"]) + 1200000.0 * (budget_factor - 1.0) - 900000.0 * (cost_factor - 1.0) - 700000.0 * (demand_factor - 1.0)
-        fairness = float(baseline["fairness_best_summary"]["average_service_access_performance"]) * min(1.1, 0.95 + 0.03 * budget_factor - 0.02 * cost_factor + 0.03 * demand_factor)
+        satisfaction = float(baseline["satisfaction_best_summary"]["average_service_access_performance"]) * min(1.1, 0.95 + 0.03 * budget_factor - 0.02 * cost_factor + 0.03 * demand_factor)
 
         served_samples.append(served)
         profit_samples.append(profit)
-        fairness_samples.append(fairness)
+        satisfaction_samples.append(satisfaction)
         rows.append(
             {
                 "sample_id": sample_id,
                 **params,
                 "served_demand_coverage": round(served, 6),
                 "financial_annual_net_profit": round(profit, 2),
-                "fairness_average_service_access_performance": round(fairness, 6),
+                "fairness_average_service_access_performance": round(satisfaction, 6),
             }
         )
 
     summary_rows = [
         summarize_monte_carlo_metric("served_demand_coverage", served_samples, risk_threshold=0.80, lower_is_risk=True),
         summarize_monte_carlo_metric("financial_annual_net_profit", profit_samples, risk_threshold=0.0, lower_is_risk=True),
-        summarize_monte_carlo_metric("fairness_average_service_access_performance", fairness_samples, risk_threshold=0.40, lower_is_risk=True),
+        summarize_monte_carlo_metric("fairness_average_service_access_performance", satisfaction_samples, risk_threshold=0.40, lower_is_risk=True),
     ]
     write_csv(OUTPUT_DIR / "4_3_monte_carlo_samples.csv", rows)
     return summary_rows
@@ -998,16 +1118,28 @@ def build_monte_carlo_rows(result_map: dict[str, dict[str, object]]) -> list[dic
 
 def main() -> None:
     scenarios = scenario_definitions()
+    main_start = time.time()
+    progress_print(
+        f"main start | elapsed={format_elapsed(0)} | eta=--:-- | scenario_count={len(scenarios)} "
+        f"| scenarios={','.join(item.code for item in scenarios)}."
+    )
     result_map = solve_and_cache_scenarios(scenarios)
 
     baseline_year5, baseline_adjusted_summary, _baseline_adjusted_detail = load_baseline_rq1_inputs()
     baseline_year5_rows = year5_population_records_to_rows(baseline_year5)
     baseline_adjusted_summary_rows = adjusted_summary_records_to_rows(baseline_adjusted_summary)
 
+    progress_print(f"build Q2 summary rows | elapsed={format_elapsed(time.time() - main_start)} | eta=--:--.")
     q2_rows = build_q2_summary_rows(scenarios, result_map)
+    progress_print(f"build Q3 summary rows | elapsed={format_elapsed(time.time() - main_start)} | eta=--:--.")
     q3_rows = build_q3_summary_rows(scenarios, result_map)
+    progress_print(f"build sensitivity rows | elapsed={format_elapsed(time.time() - main_start)} | eta=--:--.")
     sensitivity_rows = build_sensitivity_rows(scenarios, result_map)
+    progress_print(f"build robustness rows | elapsed={format_elapsed(time.time() - main_start)} | eta=--:--.")
     robustness_rows = build_robustness_rows(scenarios, result_map)
+    progress_print(
+        f"build unified summary and Monte Carlo diagnostics | elapsed={format_elapsed(time.time() - main_start)} | eta=--:--."
+    )
     unified_summary_rows = build_unified_summary_rows(
         scenarios=scenarios,
         result_map=result_map,
@@ -1017,6 +1149,7 @@ def main() -> None:
     monte_carlo_rows = build_monte_carlo_rows(result_map)
     s4_diagnostics = build_s4_diagnostics(result_map, baseline_year5_rows, baseline_adjusted_summary_rows)
 
+    progress_print(f"write output files | elapsed={format_elapsed(time.time() - main_start)} | eta=--:--.")
     write_csv(OUTPUT_DIR / "4_1_q2_scenario_summary.csv", q2_rows)
     write_csv(OUTPUT_DIR / "4_1_q3_scenario_summary.csv", q3_rows)
     write_csv(OUTPUT_DIR / "4_1_scenario_unified_summary.csv", unified_summary_rows)

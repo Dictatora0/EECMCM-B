@@ -79,7 +79,7 @@ class ScenarioResult:
     scenario_code: str
     scenario_name: str
     financial_best: object
-    fairness_best: object
+    satisfaction_best: object
     q2_best: object
     q2_safe: object
 
@@ -346,6 +346,9 @@ def q3_summary_row(
         "elderly_growth_rate": parameters["elderly_growth_rate"],
         "scheme_type": scheme_type,
         "station_plan": station_plan,
+        "served_population_coverage": summary["weighted_served_population_coverage"],
+        "weighted_served_population_coverage": summary["weighted_served_population_coverage"],
+        "served_demand_coverage": summary["served_demand_coverage"],
         "average_service_access_performance": summary["average_service_access_performance"],
         "minimum_service_access_performance": summary["minimum_service_access_performance"],
         "annual_government_subsidy": summary["annual_government_subsidy"],
@@ -391,8 +394,8 @@ def robustness_row(
     scenario_q2_metric_map: Dict[str, float],
     baseline_q3_financial_performance: float,
     scenario_q3_financial_performance: float,
-    baseline_q3_fairness_performance: float,
-    scenario_q3_fairness_performance: float,
+    baseline_q3_satisfaction_performance: float,
+    scenario_q3_satisfaction_performance: float,
     station_profit_flags: Sequence[int],
     station_utilizations: Sequence[float],
 ) -> Dict[str, object]:
@@ -445,10 +448,10 @@ def robustness_row(
             ),
             6,
         ),
-        "q3_fairness_scheme_performance_stability": round(
+        "q3_satisfaction_scheme_performance_stability": round(
             compute_stability_from_metric(
-                baseline_q3_fairness_performance,
-                scenario_q3_fairness_performance,
+                baseline_q3_satisfaction_performance,
+                scenario_q3_satisfaction_performance,
             ),
             6,
         ),

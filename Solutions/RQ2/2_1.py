@@ -199,7 +199,7 @@ def main(capacity_safety_threshold: float = SAFE_CAPACITY_THRESHOLD) -> None:
     top_output = OUTPUT_DIR / "2_1_top10_schemes.csv"
     compare_output = OUTPUT_DIR / "2_1_dual_scheme_compare.csv"
     tradeoff_output = OUTPUT_DIR / "2_1_safety_threshold_tradeoff.csv"
-    model_compare_output = OUTPUT_DIR / "2_1_model_upgrade_compare.csv"
+    model_compare_output = OUTPUT_DIR / "2_1_extension_model_upgrade_compare.csv"
 
     write_scheme_bundle("2_1_best_scheme", baseline_best, {"scheme_type": "coverage_priority_baseline"})
     write_scheme_bundle(
@@ -212,24 +212,16 @@ def main(capacity_safety_threshold: float = SAFE_CAPACITY_THRESHOLD) -> None:
     )
     if optimized_best is not None:
         write_scheme_bundle(
-            "2_1_optimized_scheme",
+            "2_1_extension_optimized_scheme",
             optimized_best,
             {
                 "scheme_type": "milp_multiobjective",
                 "model_name": "coverage_fairness_capacity_milp",
             },
         )
-        write_scheme_bundle(
-            "2_1_best_scheme",
-            optimized_best,
-            {
-                "scheme_type": "coverage_fairness_capacity_milp",
-                "model_name": "coverage_fairness_capacity_milp",
-            },
-        )
     if robust_best is not None:
         write_scheme_bundle(
-            "2_1_robust_scheme",
+            "2_1_extension_robust_scheme",
             robust_best,
             {
                 "scheme_type": "robust_capacity_priority",

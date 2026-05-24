@@ -1,0 +1,97 @@
+from importlib.util import module_from_spec, spec_from_file_location
+from pathlib import Path
+import sys
+
+
+SOLUTIONS_DIR = Path(__file__).resolve().parent
+AUDIT_PATH = SOLUTIONS_DIR / "constraint_audit.py"
+ROOT_README_PATH = SOLUTIONS_DIR.parent / "README.md"
+SOLUTIONS_README_PATH = SOLUTIONS_DIR / "README.md"
+RUNNER_PATH = SOLUTIONS_DIR.parent / "run_full_pipeline.sh"
+AUDIT_SPEC = spec_from_file_location("constraint_audit_module", AUDIT_PATH)
+if AUDIT_SPEC is None or AUDIT_SPEC.loader is None:
+    raise RuntimeError(f"Failed to load constraint audit module from {AUDIT_PATH}")
+CONSTRAINT_AUDIT = module_from_spec(AUDIT_SPEC)
+sys.modules[AUDIT_SPEC.name] = CONSTRAINT_AUDIT
+AUDIT_SPEC.loader.exec_module(CONSTRAINT_AUDIT)
+
+rq2_metric_naming_status = CONSTRAINT_AUDIT.rq2_metric_naming_status
+audit_rq3 = CONSTRAINT_AUDIT.audit_rq3
+AuditRow = CONSTRAINT_AUDIT.AuditRow
+
+
+def test_rq2_metric_naming_status_accepts_explicit_sync() -> None:
+    text = """
+`service_satisfaction` 表示已服务对象的满意度。
+`service_access_performance` 表示考虑服务承接比例后的可及绩效。
+本文统一将 `service_access_performance` 称为“服务可及绩效”，不称为“满意度”；满意度专指 `service_satisfaction` 及其分项 `distance_satisfaction`、`response_satisfaction`、`price_satisfaction`。
+"""
+    ok, _reason = rq2_metric_naming_status(text)
+    assert ok is True
+
+
+def test_rq2_metric_naming_status_rejects_ambiguous_text() -> None:
+    text = """
+`service_satisfaction` 表示小区服务满意度。
+`service_access_performance` 表示小区服务表现。
+"""
+    ok, reason = rq2_metric_naming_status(text)
+    assert ok is False
+    assert "服务可及绩效" in reason
+
+
+def test_constraint_audit_uses_split_q3_main_and_aux_paths() -> None:
+    text = AUDIT_PATH.read_text(encoding="utf-8")
+    assert "3_1_best_price_scheme_summary.csv" in text
+    assert "3_1_best_price_scheme_communities.csv" in text
+    assert "3_1_best_price_scheme_stations.csv" in text
+    assert "3_1_aux_financial_best_price_scheme_summary.csv" in text
+    assert "3_1_aux_fairness_best_price_scheme_summary.csv" in text
+    assert 'main_summary_path = RQ3_DIR / "outputs" / "3_1_best_price_scheme_summary.csv"' in text
+    assert 'aux_summary_paths = [' in text
+    assert 'legacy_paths = [' in text
+
+
+def test_constraint_audit_checks_q3_service_level_pricing_formula() -> None:
+    text = AUDIT_PATH.read_text(encoding="utf-8")
+    assert "station_service_level_pricing" in text
+    assert "p_{j,r} independent for r=1,...,5; p_{j,6}=0" in text
+
+
+def test_run_full_pipeline_uses_python3_and_current_q3_chain() -> None:
+    text = RUNNER_PATH.read_text(encoding="utf-8")
+    assert "PYTHON_BIN" in text
+    assert 'PYTHON_BIN="${PYTHON_BIN:-python3}"' in text
+    assert "Solutions/RQ3/3_1.py" in text
+    assert "Solutions/RQ3/3_4_joint_feasibility_diagnostics.py" in text
+    assert "3_5_satisfaction_objective" not in text
+
+
+def test_readmes_use_current_main_aux_q3_wording() -> None:
+    root_text = ROOT_README_PATH.read_text(encoding="utf-8")
+    solutions_text = SOLUTIONS_README_PATH.read_text(encoding="utf-8")
+    assert "3_1_best_price_scheme_*" in root_text
+    assert "3_1_aux_financial_best_price_scheme_*" in root_text
+    assert "3_5_satisfaction_objective" not in root_text
+    assert "双方案比较" not in root_text
+    assert "3_1_best_price_scheme_*" in solutions_text
+    assert "3_1_aux_financial_best_price_scheme_*" in solutions_text
+    assert "3_5_satisfaction_objective" not in solutions_text
+
+
+def run_all_tests() -> None:
+    tests = [
+        test_rq2_metric_naming_status_accepts_explicit_sync,
+        test_rq2_metric_naming_status_rejects_ambiguous_text,
+        test_constraint_audit_uses_split_q3_main_and_aux_paths,
+        test_constraint_audit_checks_q3_service_level_pricing_formula,
+        test_run_full_pipeline_uses_python3_and_current_q3_chain,
+        test_readmes_use_current_main_aux_q3_wording,
+    ]
+    for test in tests:
+        test()
+    print(f"Passed {len(tests)} tests.")
+
+
+if __name__ == "__main__":
+    run_all_tests()

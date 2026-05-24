@@ -707,15 +707,21 @@ def direct_cost_by_service() -> Dict[str, float]:
     return {service: service_costs[service]["direct_cost"] for service in SERVICE_ORDER}
 
 
-def recommended_price_candidates() -> Dict[str, List[float]]:
+def recommended_price_candidates(grid_level: str = "full") -> Dict[str, List[float]]:
     base_prices = base_price_by_service()
+    if grid_level == "basic":
+        multipliers = [1.0, 1.1, 1.2]
+    elif grid_level == "full":
+        multipliers = [1.0, 1.1, 1.2, 1.3, 1.5, 1.8, 2.0]
+    else:
+        raise ValueError(f"Unsupported price grid level: {grid_level}")
     result: Dict[str, List[float]] = {}
     for service in SERVICE_ORDER:
         if service == "紧急救助":
             result[service] = [0.0]
             continue
         base = base_prices[service]
-        result[service] = [base, 1.1 * base, 1.2 * base, 1.3 * base]
+        result[service] = [multiplier * base for multiplier in multipliers]
     return result
 
 
