@@ -148,7 +148,7 @@ def representative_rows(
     dual_rows: List[Dict[str, str]],
 ) -> List[Dict[str, object]]:
     financial_scheme = select_dual_scheme(dual_rows, "financial_sustainable_scheme")
-    satisfaction_priority_scheme = select_dual_scheme(dual_rows, "fairness_priority_scheme")
+    satisfaction_priority_scheme = select_dual_scheme(dual_rows, "satisfaction_priority_scheme")
     frontier_profit_peak = select_frontier_profit_peak(frontier_rows)
     frontier_satisfaction_peak = select_frontier_satisfaction_peak(frontier_rows)
     frontier_converged_reference = select_frontier_converged_reference(frontier_rows)
@@ -470,12 +470,12 @@ def write_paper_notes(
     representative_scheme_rows: List[Dict[str, object]],
 ) -> None:
     financial_scheme = select_dual_scheme(dual_rows, "financial_sustainable_scheme")
-    satisfaction_priority_scheme = select_dual_scheme(dual_rows, "fairness_priority_scheme")
+    satisfaction_priority_scheme = select_dual_scheme(dual_rows, "satisfaction_priority_scheme")
     frontier_profit_peak = select_frontier_profit_peak(frontier_rows)
     frontier_satisfaction_peak = select_frontier_satisfaction_peak(frontier_rows)
     converged_count = sum(int(row["converged"]) for row in frontier_rows)
     station_profit_compliant_count = sum(int(row["profit_compliant"]) for row in frontier_rows)
-    fairness_threshold_count = sum(
+    satisfaction_threshold_count = sum(
         1
         for row in frontier_rows
         if as_float(row, "minimum_service_satisfaction") >= FAIRNESS_THRESHOLD - 1e-9
@@ -498,7 +498,7 @@ def write_paper_notes(
         )
         + "。",
         f"- Only {converged_count} frontier point(s) converged, and {station_profit_compliant_count} frontier point(s) satisfy station-level profit compliance.",
-        f"- No frontier point reaches the minimum service satisfaction threshold {FAIRNESS_THRESHOLD:.2f}; the count above threshold is {fairness_threshold_count}.",
+        f"- No frontier point reaches the minimum service satisfaction threshold {FAIRNESS_THRESHOLD:.2f}; the count above threshold is {satisfaction_threshold_count}.",
         f"- The profit-extreme frontier point is `{frontier_profit_peak['price_scheme_detail']}` under `{frontier_profit_peak['subsidy_policy']}`. It reaches profit rate {as_float(frontier_profit_peak, 'profit_rate'):.6f} and annual net profit {annual_net_profit_wan(frontier_profit_peak):.2f} 万元, but its minimum service satisfaction is only {as_float(frontier_profit_peak, 'minimum_service_satisfaction'):.6f}, while auxiliary minimum accessibility is {as_float(frontier_profit_peak, 'minimum_service_access_performance'):.6f}.",
         f"- The satisfaction-extreme frontier point is `{frontier_satisfaction_peak['price_scheme_detail']}` under `{frontier_satisfaction_peak['subsidy_policy']}`. It raises average service satisfaction to {as_float(frontier_satisfaction_peak, 'average_service_satisfaction'):.6f}, minimum service satisfaction to {as_float(frontier_satisfaction_peak, 'minimum_service_satisfaction'):.6f}, and lowers Gini to {as_float(frontier_satisfaction_peak, 'gini_access'):.6f}.",
         f"- The implementable financial sustainable scheme is `{financial_scheme['price_scheme_detail']}`. It achieves station-level profit compliance with profit rate {as_float(financial_scheme, 'profit_rate'):.6f} and annual net profit {annual_net_profit_wan(financial_scheme):.2f} 万元, with average service satisfaction {as_float(financial_scheme, 'average_service_satisfaction'):.6f} and minimum service satisfaction {as_float(financial_scheme, 'minimum_service_satisfaction'):.6f}.",
@@ -558,7 +558,7 @@ def main() -> None:
     write_csv(OUTPUT_DIR / "3_2_aux_satisfaction_tradeoff_representative_schemes.csv", representative_scheme_rows)
 
     financial_scheme = select_dual_scheme(dual_rows, "financial_sustainable_scheme")
-    satisfaction_priority_scheme = select_dual_scheme(dual_rows, "fairness_priority_scheme")
+    satisfaction_priority_scheme = select_dual_scheme(dual_rows, "satisfaction_priority_scheme")
     plot_profit_vs_average_satisfaction(frontier_rows, financial_scheme, satisfaction_priority_scheme)
     plot_min_satisfaction_vs_net_profit(frontier_rows, financial_scheme, satisfaction_priority_scheme)
     write_paper_notes(frontier_rows, dual_rows, policy_rows, representative_scheme_rows)

@@ -33,8 +33,6 @@ COLUMN_ALIASES = {
     "服务站点": "station",
     "service_access_performance": "service_access_performance",
     "average_service_access_performance": "average_service_access_performance",
-    "annual_net_profit_after_policy_subsidy": "annual_net_profit",
-    "annual_net_profit_after_subsidy": "annual_net_profit",
     "annual_net_profit": "annual_net_profit",
     "profit_rate": "profit_rate",
 }
@@ -67,6 +65,10 @@ def normalize_columns(frame: pd.DataFrame) -> pd.DataFrame:
         rename_map[column] = canonical
         planned_targets.add(canonical)
     normalized = normalized.rename(columns=rename_map)
+    if "annual_net_profit_after_policy_subsidy" in normalized.columns and "annual_net_profit" not in normalized.columns:
+        normalized["annual_net_profit"] = normalized["annual_net_profit_after_policy_subsidy"]
+    if "annual_net_profit_after_subsidy" in normalized.columns and "annual_net_profit" not in normalized.columns:
+        normalized["annual_net_profit"] = normalized["annual_net_profit_after_subsidy"]
     return add_canonical_metric_alias_columns(normalized)
 
 

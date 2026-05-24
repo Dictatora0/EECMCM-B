@@ -139,7 +139,7 @@ RQ3 当前输出分成两层：
 
 - 主结果：`3_1_best_price_scheme_*`
   这是题面主模型的标准输出，正文应优先引用这一组文件。
-- 辅助扩展：`3_1_aux_financial_best_price_scheme_*`、`3_1_aux_fairness_best_price_scheme_*`、`3_1_aux_pareto_frontier.csv`、`3_1_aux_dual_scheme_comparison.csv`
+- 辅助扩展：`3_1_aux_financial_best_price_scheme_*`、`3_1_aux_satisfaction_best_price_scheme_*`、`3_1_aux_pareto_frontier.csv`、`3_1_aux_dual_scheme_comparison.csv`
   这些文件只用于扩展比较、附录或补充分析，不覆盖主结果。
 
 辅助扩展中的满意度优先方案若未收敛或不满足利润率约束，只能作为参考方案解释，不能写成“题目唯一最优方案”。
@@ -172,6 +172,12 @@ RQ3 当前输出分成两层：
 ## 12. 兼容字段名说明
 
 为兼容既有缓存、审计脚本和旧版图表链路，当前仓库仍保留少量 legacy 字段名。它们只作为兼容输出存在，内部主逻辑与论文表述统一使用 satisfaction 口径。
+
+当前 canonical 辅助输出文件名前缀为：
+
+- `3_1_aux_satisfaction_best_price_scheme_*`
+
+如果目录中仍出现 `3_1_aux_fairness_best_price_scheme_*`，它表示旧结果残留，不应再作为论文引用对象。
 
 - 方案标签兼容：
   - canonical：`satisfaction_priority_scheme`

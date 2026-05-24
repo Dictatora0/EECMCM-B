@@ -7,7 +7,7 @@
 - `RQ1/`
   - 人口递推、理论需求与消费约束需求。
 - `RQ2/`
-  - 选址、规模、分配、容量与基准价财务评价。
+  - 选址、规模、单站分配、容量与基准价财务评价。
 - `RQ3/`
   - 以老人满意度为主目标的定价、固定点迭代和主结果/辅助扩展输出。
 - `RQ4/`
@@ -34,11 +34,30 @@ python3 Solutions/RQ2/2_2_multiobjective_extension.py
 python3 Solutions/RQ3/3_1.py --max-candidate-profiles 64 --max-candidates-per-station 30 --price-grid-level full
 python3 Solutions/RQ3/3_4_joint_feasibility_diagnostics.py
 python3 Solutions/RQ4/4_1.py
+python3 Solutions/plots/build_all_plots.py
 ```
 
 若只想做分题重跑，可按下表处理。
 
 ## 分题运行关系
+
+### Plots
+
+- 统一入口：`python3 Solutions/plots/build_all_plots.py`
+- 输入来源：
+  - RQ1 至 RQ4 的最新 `outputs/`
+- 作用：
+  - 统一生成论文图；
+  - 写出 `plot_manifest.csv`；
+  - 写出 `plot_notes.md`。
+- 输出位置：
+  - `Solutions/plots/outputs/`
+- 绘图配置：
+  - 默认优先使用 `Songti SC` 作为中文字体；
+  - 运行前自动设置 `MPLCONFIGDIR` 到 `Solutions/plots/outputs/.mplconfig/`；
+  - 已处理 `DejaVu Sans` 中文 glyph warning。
+- 运行提示：
+  - 当前若仍看到 warning，通常只剩 `sklearn.manifold._mds` 的 `FutureWarning`，不影响图文件生成。
 
 ### RQ1
 
@@ -86,7 +105,7 @@ python3 Solutions/RQ4/4_1.py
 - 作用：
   - 在既定布局上搜索以老人满意度为主目标的定价方案；
   - 输出题面主结果 `3_1_best_price_scheme_*`；
-  - 输出 `3_1_aux_financial_best_price_scheme_*` 与 `3_1_aux_fairness_best_price_scheme_*` 辅助扩展方案；
+  - 输出 `3_1_aux_financial_best_price_scheme_*` 与 `3_1_aux_satisfaction_best_price_scheme_*` 辅助扩展方案；
   - 输出固定点迭代轨迹、站点财务表和小区满意度/可及绩效表。
   - 扩展输出逐站联合可行性绑定约束诊断。
   - 同脚本支持站点—服务项目级扩搜：
@@ -96,7 +115,7 @@ python3 Solutions/RQ4/4_1.py
 - 说明文档：
   - [RQ3 接口与口径说明](./RQ3/README.md)
   - 输出位置：`Solutions/RQ3/outputs/`
-  - 其中 `3_1_best_price_scheme_*` 为主结果；`3_1_aux_*`、`3_2_aux_*` 为辅助扩展结果。
+- 其中 `3_1_best_price_scheme_*` 为主结果；`3_1_aux_*`、`3_2_aux_*` 为辅助扩展结果。
 
 ### 兼容命名
 
@@ -106,6 +125,11 @@ python3 Solutions/RQ4/4_1.py
 - `fair_satisfaction_compliant` -> `satisfaction_compliant`
 - `q3_fairness_minimum_service_access_performance` -> `q3_satisfaction_minimum_service_access_performance`
 - `q3_fairness_scheme_performance_stability` -> `q3_satisfaction_scheme_performance_stability`
+
+注意：
+
+- `3_1_aux_satisfaction_best_price_scheme_*` 是当前问题3辅助满意度方案的 canonical 输出文件名前缀。
+- 若工作区里仍看到 `3_1_aux_fairness_best_price_scheme_*`，应视为旧结果残留；重新运行后应由新前缀替代。
 
 完整对照表见：
 
@@ -183,13 +207,16 @@ cd /Users/lifulin/Desktop/B
 # 完整重跑
 bash run_full_pipeline.sh full
 
-# 入口守护测试
+# 只重建论文图表
+bash run_full_pipeline.sh plots
+
+# 入口守护测试（含约束审计、plot 守护、RQ2-RQ4 测试）
 bash run_full_pipeline.sh test
 
 # RQ3 扩搜：light + medium + heavy
 bash run_full_pipeline.sh rq3-expanded all
 
-# 清空所有 outputs 和缓存
+# 清空所有 outputs、RQ4/cache 和缓存
 bash run_full_pipeline.sh clean
 ```
 
@@ -198,11 +225,14 @@ bash run_full_pipeline.sh clean
 ```bash
 cd /Users/lifulin/Desktop/B
 
-# 清空所有 outputs 和缓存
+# 清空所有 outputs、RQ4/cache 和缓存
 bash run_full_pipeline.sh clean
 
 # 完整重跑，并包含 3 个算法升级扩展
 bash run_full_pipeline.sh full
+
+# 只重建论文图表
+bash run_full_pipeline.sh plots
 
 # 入口守护测试
 bash run_full_pipeline.sh test
@@ -226,6 +256,22 @@ bash run_full_pipeline.sh rq3-expanded heavy
 bash run_full_pipeline.sh rq3-expanded extreme
 ```
 
+当前统一脚本支持的命令与作用如下：
+
+- `bash run_full_pipeline.sh full`
+  - 重算 RQ1 到 RQ4 的主结果与扩展结果，并在末尾自动执行 `Solutions/plots/build_all_plots.py`。
+- `bash run_full_pipeline.sh plots`
+  - 基于现有 `outputs/` 直接重建论文图、`plot_manifest.csv` 和 `plot_notes.md`。
+- `bash run_full_pipeline.sh test`
+  - 运行 `Solutions/tests_constraint_audit.py`、`Solutions/plots/tests.py`、`Solutions/RQ2/tests.py`、`Solutions/RQ3/tests.py`、`Solutions/RQ4/tests.py`。
+  - 若缺少 RQ1/RQ2 最小前置输出，会先自动补齐。
+- `bash run_full_pipeline.sh test-rq3`
+  - 仅运行 `Solutions/RQ3/tests.py`。
+- `bash run_full_pipeline.sh clean`
+  - 清空 `Solutions/*/outputs/` 下的数值结果、统一生图图片、`plot_manifest.csv`、`plot_notes.md`、`.mplconfig`，以及 `Solutions/RQ4/cache/*.json` 和 `__pycache__`。
+- `bash run_full_pipeline.sh rq3-expanded {all|light|medium|heavy|extreme}`
+  - 运行 RQ3 站点-服务级扩搜，默认针对 `S0,S4`。
+
 ## 终端进度
 
 `RQ3` 与 `RQ4` 的长任务会在终端打印：
@@ -241,3 +287,41 @@ bash run_full_pipeline.sh rq3-expanded extreme
 - 若修改了选址、容量、安全阈值或问题2财务口径，从 RQ2 开始重跑，并同步重跑 RQ3、RQ4。
 - 若修改了定价、补贴、利润率约束或固定点迭代参数，从 RQ3 开始重跑，并同步重跑 RQ4。
 - 若只修改了情景分析写法或情景参数，从 RQ4 开始重跑，但要确认是否需要联动触发 RQ1 至 RQ3 的重算。
+- 若只修改了图题、图注、图表筛选或版式映射，直接执行 `bash run_full_pipeline.sh plots`。
+- 若需要保证论文结果完全由当前代码重算得到，先执行 `bash run_full_pipeline.sh clean`，再执行 `bash run_full_pipeline.sh full`。
+- `RQ4` 会拒绝复用不符合当前主模型口径的旧缓存，包括旧版 `alpha_j` 定价摘要、旧溢出分流结果和缺失主摘要键的缓存文件。
+- `bash run_full_pipeline.sh full` 会在数值结果后自动调用 `Solutions/plots/build_all_plots.py`，统一图产物写到 `Solutions/plots/outputs/`。
+- `bash run_full_pipeline.sh test` 当前也会覆盖 `Solutions/plots/tests.py`，用于守护图编号、标题、落位、字段口径和字体配置。
+- 无论从统一入口还是直接调用各 `plot_rq*.py` builder，都会先应用同一套 `Songti SC` 字体配置，确保中文标题和坐标轴不再回退到 `DejaVu Sans`。
+
+## 完整实验命令
+
+若你要从头跑完整实验并拿结果，直接执行：
+
+```bash
+cd /Users/lifulin/Desktop/B
+
+# 1. 清空已有数值输出、图片类结果和缓存
+bash run_full_pipeline.sh clean
+
+# 2. 重跑 RQ1 -> RQ4，并自动统一生图
+bash run_full_pipeline.sh full
+
+# 3. 跑守护测试确认入口、图链路和题面口径一致
+bash run_full_pipeline.sh test
+```
+
+运行完成后，结果主要在：
+
+- `Solutions/RQ1/outputs/`
+- `Solutions/RQ2/outputs/`
+- `Solutions/RQ3/outputs/`
+- `Solutions/RQ4/outputs/`
+- `Solutions/plots/outputs/`
+
+如果只改了绘图层，不重算模型，直接执行：
+
+```bash
+cd /Users/lifulin/Desktop/B
+bash run_full_pipeline.sh plots
+```

@@ -55,7 +55,7 @@ METRIC_LABELS = {
     "theoretical_total_monthly_demand": "理论月需求总量",
     "adjusted_total_monthly_demand": "消费约束后月需求总量",
     "matrix_equivalence_max_abs_diff": "矩阵等价最大绝对误差",
-    "epsilon_min_access_threshold": "最低满意度阈值",
+    "epsilon_min_access_threshold": "最低可及绩效阈值",
     "epsilon_feasible_count": "可行方案数量",
     "binding_capacity_risk": "容量瓶颈风险",
     "full_profit_compliance": "全局利润合规",

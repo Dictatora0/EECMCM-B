@@ -5,10 +5,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-import matplotlib
-from matplotlib import font_manager
-
-
 PLOTS_DIR = Path(__file__).resolve().parent
 ROOT = PLOTS_DIR.parents[1]
 OUTPUT_DIR = PLOTS_DIR / "outputs"
@@ -17,7 +13,11 @@ PNG_DIR = OUTPUT_DIR / "png"
 SVG_DIR = OUTPUT_DIR / "svg"
 MPLCONFIGDIR = OUTPUT_DIR / ".mplconfig"
 MPLCONFIGDIR.mkdir(parents=True, exist_ok=True)
-os.environ.setdefault("MPLCONFIGDIR", str(MPLCONFIGDIR))
+os.environ["MPLCONFIGDIR"] = str(MPLCONFIGDIR)
+
+import matplotlib
+from matplotlib import font_manager
+
 matplotlib.use("Agg")
 
 
@@ -40,8 +40,8 @@ class PlotStyle:
 
 
 CN_FONT_CANDIDATES = (
-    "SimSun",
     "Songti SC",
+    "SimSun",
     "STSong",
     "Noto Serif CJK SC",
     "Source Han Serif SC",
@@ -116,8 +116,8 @@ def configure_matplotlib() -> PlotStyle:
             "ytick.labelsize": style.tick_size,
             "legend.fontsize": style.legend_size,
             "axes.unicode_minus": False,
-            "font.family": ["serif", "sans-serif"],
-            "font.serif": [style.font_cn, style.font_en, "DejaVu Serif"],
+            "font.family": [style.font_cn],
+            "font.serif": [style.font_cn, style.font_en, "Arial Unicode MS", "DejaVu Serif"],
             "font.sans-serif": [style.font_cn, "Arial Unicode MS", "DejaVu Sans"],
             "mathtext.fontset": "dejavuserif",
             "pdf.fonttype": 42,
@@ -126,3 +126,7 @@ def configure_matplotlib() -> PlotStyle:
         }
     )
     return style
+
+
+def ensure_matplotlib_configured() -> PlotStyle:
+    return configure_matplotlib()

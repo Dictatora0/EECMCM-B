@@ -7,6 +7,7 @@ SOLUTIONS_DIR = Path(__file__).resolve().parent
 AUDIT_PATH = SOLUTIONS_DIR / "constraint_audit.py"
 ROOT_README_PATH = SOLUTIONS_DIR.parent / "README.md"
 SOLUTIONS_README_PATH = SOLUTIONS_DIR / "README.md"
+RQ4_README_TARGET_PATH = SOLUTIONS_DIR / "RQ4" / "4_1.py"
 RUNNER_PATH = SOLUTIONS_DIR.parent / "run_full_pipeline.sh"
 AUDIT_SPEC = spec_from_file_location("constraint_audit_module", AUDIT_PATH)
 if AUDIT_SPEC is None or AUDIT_SPEC.loader is None:
@@ -46,7 +47,7 @@ def test_constraint_audit_uses_split_q3_main_and_aux_paths() -> None:
     assert "3_1_best_price_scheme_communities.csv" in text
     assert "3_1_best_price_scheme_stations.csv" in text
     assert "3_1_aux_financial_best_price_scheme_summary.csv" in text
-    assert "3_1_aux_fairness_best_price_scheme_summary.csv" in text
+    assert "3_1_aux_satisfaction_best_price_scheme_summary.csv" in text
     assert 'main_summary_path = RQ3_DIR / "outputs" / "3_1_best_price_scheme_summary.csv"' in text
     assert 'aux_summary_paths = [' in text
     assert 'legacy_paths = [' in text
@@ -64,6 +65,10 @@ def test_run_full_pipeline_uses_python3_and_current_q3_chain() -> None:
     assert 'PYTHON_BIN="${PYTHON_BIN:-python3}"' in text
     assert "Solutions/RQ3/3_1.py" in text
     assert "Solutions/RQ3/3_4_joint_feasibility_diagnostics.py" in text
+    assert "Solutions/plots/build_all_plots.py" in text
+    assert "bash run_full_pipeline.sh plots" in text
+    assert "Solutions/RQ4/tests.py" in text
+    assert "find \"$ROOT_DIR/Solutions/RQ4/cache\"" in text
     assert "3_5_satisfaction_objective" not in text
 
 
@@ -77,6 +82,16 @@ def test_readmes_use_current_main_aux_q3_wording() -> None:
     assert "3_1_best_price_scheme_*" in solutions_text
     assert "3_1_aux_financial_best_price_scheme_*" in solutions_text
     assert "3_5_satisfaction_objective" not in solutions_text
+    assert "bash run_full_pipeline.sh plots" in root_text
+    assert "bash run_full_pipeline.sh plots" in solutions_text
+    assert "Solutions/plots/outputs/" in root_text
+    assert "Solutions/plots/outputs/" in solutions_text
+
+
+def test_rq4_source_drops_coordination_diversion_wording() -> None:
+    text = RQ4_README_TARGET_PATH.read_text(encoding="utf-8")
+    assert "不再分流至第二站" in text
+    assert "协同站点分流" not in text
 
 
 def run_all_tests() -> None:
@@ -87,6 +102,7 @@ def run_all_tests() -> None:
         test_constraint_audit_checks_q3_service_level_pricing_formula,
         test_run_full_pipeline_uses_python3_and_current_q3_chain,
         test_readmes_use_current_main_aux_q3_wording,
+        test_rq4_source_drops_coordination_diversion_wording,
     ]
     for test in tests:
         test()

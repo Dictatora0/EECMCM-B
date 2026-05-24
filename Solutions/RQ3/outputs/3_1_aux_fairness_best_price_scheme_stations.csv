@@ -1,4 +1,0 @@
-﻿station_community,scale,raw_served_demand_daily,effective_person_times_daily,annual_service_revenue,annual_direct_cost,annual_fixed_cost,annual_depreciation,annual_government_subsidy,annual_subsidy,annual_total_cost,annual_net_profit_before_subsidy,annual_net_profit_after_subsidy,annual_net_profit,profit_rate,profit_compliant,emergency_public_loss
-A,大型,2351.1287912892712,2243.573048185744,13775188.66,11419867.52,1606000.0,22500.0,949000.0,949000.0,13048367.52,726821.14,1675821.14,1675821.14,0.128431,0,156787.06
-C,小型,0.0,0.0,0.0,0.0,730000.0,9000.0,0.0,0.0,739000.0,-739000.0,-739000.0,-739000.0,-1.0,0,0.0
-E,大型,3000.0,2880.2578512771665,17460646.88,14593263.42,1606000.0,22500.0,949000.0,949000.0,16221763.42,1238883.46,2187883.46,2187883.46,0.134873,0,198500.71

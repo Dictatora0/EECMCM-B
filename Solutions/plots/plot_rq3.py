@@ -10,7 +10,7 @@ import seaborn as sns
 from alias_maps import canonicalize_scheme_keys
 from data_loader import MissingDataError, get_module_output_dir, load_csv_if_exists, read_module_output
 from label_maps import pretty_metric_label, pretty_scheme_label
-from plot_config import get_plot_style
+from plot_config import ensure_matplotlib_configured
 from plot_utils import PlotResult, generated_result, save_figure, skipped_result
 
 
@@ -181,7 +181,7 @@ def _select_service_level_scheme(summary_df: pd.DataFrame, scenario: str | None 
 
 def build_rq3_plots(export_formats: list[str]) -> list[PlotResult]:
     results: list[PlotResult] = []
-    style = get_plot_style()
+    style = ensure_matplotlib_configured()
     rq3_output_dir = get_module_output_dir("RQ3")
 
     try:
@@ -296,7 +296,7 @@ def build_rq3_plots(export_formats: list[str]) -> list[PlotResult]:
         results.append(
             _skip_missing(
                 "rq3_02",
-                "问题3定价方案的利润—满意度权衡前沿",
+                "问题3社区平均老人满意度前沿图",
                 str(exc),
                 recommended_location="main_text",
             )
@@ -305,48 +305,71 @@ def build_rq3_plots(export_formats: list[str]) -> list[PlotResult]:
         frontier_path = None
     else:
         frontier_df = frontier_df.copy()
-        for column in [
+        required_frontier_columns = {
             "annual_net_profit",
             "average_service_satisfaction",
             "minimum_service_satisfaction",
-            "average_service_access_performance",
-            "minimum_service_access_performance",
             "profit_compliant",
             "converged",
-            "profit_rate",
-        ]:
-            if column in frontier_df.columns:
-                frontier_df[column] = pd.to_numeric(frontier_df[column], errors="coerce")
-        fig, ax = plt.subplots(figsize=(style.figure_width, style.figure_height))
-        sns.scatterplot(
-            data=frontier_df,
-            x="annual_net_profit",
-            y="average_service_satisfaction",
-            hue="profit_compliant",
-            style="converged",
-            palette={0: style.colors[3], 1: style.colors[2]},
-            s=90,
-            ax=ax,
-        )
-        ax.set_title("问题3定价方案的利润—满意度权衡前沿")
-        ax.set_xlabel("年净利润 / 元")
-        ax.set_ylabel("平均老人满意度")
-        handles, labels = ax.get_legend_handles_labels()
-        label_map = {"profit_compliant": "利润率达标", "converged": "是否收敛", "0": "否", "1": "是"}
-        ax.legend(handles, [label_map.get(label, label) for label in labels], frameon=False, title="")
-        outputs = save_figure(fig, "rq3_02_pareto_profit_avg_access", export_formats)
-        results.append(
-            generated_result(
-                "rq3_02",
-                "问题3定价方案的利润—满意度权衡前沿",
-                "RQ3",
-                [str(frontier_path)],
-                "main_text",
-                "展示满意度主目标下定价方案在利润与平均老人满意度之间的权衡关系，可作为问题3正文核心前沿图。",
-                frontier_df,
-                outputs,
+        }
+        missing_frontier_columns = sorted(required_frontier_columns - set(frontier_df.columns))
+        if missing_frontier_columns:
+            results.append(
+                _skip_missing(
+                    "rq3_02",
+                    "问题3社区平均老人满意度前沿图",
+                    "Pareto 前沿结果缺少满意度主图所需字段："
+                    + ", ".join(missing_frontier_columns)
+                    + "。不能用辅助可及绩效字段替代满意度字段。",
+                    [str(frontier_path)],
+                    "main_text",
+                )
             )
-        )
+            frontier_df = None
+            frontier_path = None
+        else:
+            for column in [
+                "annual_net_profit",
+                "average_service_satisfaction",
+                "minimum_service_satisfaction",
+                "average_service_access_performance",
+                "minimum_service_access_performance",
+                "profit_compliant",
+                "converged",
+                "profit_rate",
+            ]:
+                if column in frontier_df.columns:
+                    frontier_df[column] = pd.to_numeric(frontier_df[column], errors="coerce")
+            fig, ax = plt.subplots(figsize=(style.figure_width, style.figure_height))
+            sns.scatterplot(
+                data=frontier_df,
+                x="annual_net_profit",
+                y="average_service_satisfaction",
+                hue="profit_compliant",
+                style="converged",
+                palette={0: style.colors[3], 1: style.colors[2]},
+                s=90,
+                ax=ax,
+            )
+            ax.set_title("问题3社区平均老人满意度前沿图")
+            ax.set_xlabel("年净利润 / 元")
+            ax.set_ylabel("社区平均老人满意度")
+            handles, labels = ax.get_legend_handles_labels()
+            label_map = {"profit_compliant": "利润率达标", "converged": "是否收敛", "0": "否", "1": "是"}
+            ax.legend(handles, [label_map.get(label, label) for label in labels], frameon=False, title="")
+            outputs = save_figure(fig, "rq3_02_pareto_profit_avg_satisfaction", export_formats)
+            results.append(
+                generated_result(
+                    "rq3_02",
+                    "问题3社区平均老人满意度前沿图",
+                    "RQ3",
+                    [str(frontier_path)],
+                    "main_text",
+                    "展示满意度主目标下定价方案在利润与社区平均老人满意度之间的权衡关系，可作为问题3正文核心前沿图。",
+                    frontier_df,
+                    outputs,
+                )
+            )
 
     representative_df = None
     representative_path_strs: list[str] = []
@@ -379,7 +402,7 @@ def build_rq3_plots(export_formats: list[str]) -> list[PlotResult]:
         results.append(
             _skip_missing(
                 "rq3_03",
-                "代表性定价方案的最低满意度与年净利润对比",
+                "问题3最低老人满意度边界图",
                 "当前未生成代表方案汇总，也无法由现有 Pareto 前沿结果构造可用于正文比较的代表性方案。",
                 recommended_location="main_text",
             )
@@ -395,7 +418,7 @@ def build_rq3_plots(export_formats: list[str]) -> list[PlotResult]:
             results.append(
                 _skip_missing(
                     "rq3_03",
-                    "代表性定价方案的最低满意度与年净利润对比",
+                    "问题3最低老人满意度边界图",
                     "代表方案汇总缺少 `minimum_service_satisfaction` 字段，不能用辅助可及绩效替代最低老人满意度。",
                     representative_path_strs,
                     "main_text",
@@ -428,18 +451,18 @@ def build_rq3_plots(export_formats: list[str]) -> list[PlotResult]:
                     ha=ha,
                     va="bottom",
                 )
-            ax.set_title("代表性定价方案的最低满意度与年净利润对比")
+            ax.set_title("问题3最低老人满意度边界图")
             ax.set_xlabel("年净利润 / 万元")
             ax.set_ylabel("最低老人满意度")
             ax.set_ylim(max(0.59, representative_df[y_col].min() - 0.02), min(1.01, representative_df[y_col].max() + 0.02))
-            outputs = save_figure(fig, "rq3_03_pareto_min_access", export_formats)
-            reason = "聚焦少量代表性定价方案而非全部点云，更适合在正文直接解释最低满意度边界与财务代价。"
+            outputs = save_figure(fig, "rq3_03_pareto_min_satisfaction", export_formats)
+            reason = "聚焦少量代表性定价方案而非全部点云，更适合在正文直接解释最低老人满意度边界与财务代价。"
             if representative_path_strs and representative_path_strs[0].endswith("3_1_pareto_frontier.csv"):
-                reason = "当前缺少 3_2 代表方案汇总，已根据现有 Pareto 前沿自动构造利润峰值、满意度峰值和收敛参考方案。"
+                reason = "当前缺少 3_2 代表方案汇总，已根据现有 Pareto 前沿自动构造利润峰值、满意度峰值和收敛参考方案，用于近似刻画最低老人满意度边界。"
             results.append(
                 generated_result(
                     "rq3_03",
-                    "代表性定价方案的最低满意度与年净利润对比",
+                    "问题3最低老人满意度边界图",
                     "RQ3",
                     representative_path_strs,
                     "main_text",
@@ -454,6 +477,8 @@ def build_rq3_plots(export_formats: list[str]) -> list[PlotResult]:
             "RQ3",
             candidate_keywords=[
                 ["3_5", "service", "level", "pricing", "community", "satisfaction"],
+                ["3_1", "satisfaction", "community"],
+                ["3_1", "satisfaction", "communities"],
                 ["3_1", "fairness", "community"],
                 ["3_1", "fairness", "communities"],
                 ["fairness", "community"],
@@ -601,13 +626,13 @@ def build_rq3_plots(export_formats: list[str]) -> list[PlotResult]:
         axes[0].set_ylabel("收敛率")
         epsilon_valid = epsilon_df[epsilon_df["feasible_count"] > 0].copy()
         sns.lineplot(data=epsilon_valid, x="epsilon", y="fiscal_gap", marker="o", color=style.colors[3], ax=axes[1])
-        axes[1].set_title("公平阈值与财政缺口")
-        axes[1].set_xlabel("公平阈值 ε")
+        axes[1].set_title("可及绩效阈值与财政缺口")
+        axes[1].set_xlabel("最低可及绩效阈值 ε")
         axes[1].set_ylabel("财政缺口 / 元")
         sns.lineplot(data=epsilon_valid, x="epsilon", y="minimum_service_access_performance", marker="o", color=style.colors[2], label="最低可及绩效", ax=axes[2])
         sns.lineplot(data=epsilon_valid, x="epsilon", y="average_service_access_performance", marker="s", color=style.colors[1], label="平均可及绩效", ax=axes[2])
-        axes[2].set_title("公平阈值与服务可及绩效")
-        axes[2].set_xlabel("公平阈值 ε")
+        axes[2].set_title("可及绩效阈值与服务可及绩效")
+        axes[2].set_xlabel("最低可及绩效阈值 ε")
         axes[2].set_ylabel("绩效值")
         axes[2].legend(frameon=False)
         outputs = save_figure(fig, "rq3_06_stability_suite", export_formats)
@@ -618,7 +643,7 @@ def build_rq3_plots(export_formats: list[str]) -> list[PlotResult]:
                 "RQ3",
                 stability_files,
                 "appendix",
-                "统一重绘阻尼与公平阈值诊断图，便于在附录说明算法稳定性。",
+                "统一重绘阻尼与可及绩效阈值诊断图，便于在附录说明算法稳定性。",
                 pd.concat([damping_df.head(20), epsilon_valid.head(20)], ignore_index=True, sort=False),
                 outputs,
             )

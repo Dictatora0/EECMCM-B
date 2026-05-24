@@ -8,7 +8,7 @@ import seaborn as sns
 
 from data_loader import MissingDataError, read_first_existing
 from label_maps import pretty_metric_label
-from plot_config import ROOT, get_plot_style
+from plot_config import ROOT, ensure_matplotlib_configured
 from plot_utils import PlotResult, generated_result, is_low_information_series, save_figure, skipped_result
 
 
@@ -35,6 +35,14 @@ def _load_adjusted_summary() -> tuple[pd.DataFrame, list[str]]:
     frame, path = read_first_existing(
         [RQ1_OUTPUT / "1_3_high_precision_adjusted_demand.csv"],
         required_columns=["community", "service", "adjusted_monthly_demand"],
+    )
+    return frame, [str(path)]
+
+
+def _load_theoretical_summary() -> tuple[pd.DataFrame, list[str]]:
+    frame, path = read_first_existing(
+        [RQ1_OUTPUT / "1_2_high_precision_theoretical_demand.csv"],
+        required_columns=["community", "service", "theoretical_monthly_demand"],
     )
     return frame, [str(path)]
 
@@ -77,7 +85,7 @@ def _case_label(case_name: str) -> str:
 
 def build_rq1_plots(export_formats: list[str]) -> list[PlotResult]:
     results: list[PlotResult] = []
-    style = get_plot_style()
+    style = ensure_matplotlib_configured()
 
     try:
         population_df, population_files = _load_population_by_year()
@@ -168,6 +176,43 @@ def build_rq1_plots(export_formats: list[str]) -> list[PlotResult]:
             )
 
     try:
+        theoretical_summary_df, theoretical_summary_files = _load_theoretical_summary()
+    except MissingDataError as exc:
+        theoretical_summary_df = None
+        theoretical_summary_files = []
+        results.append(
+            skipped_result(
+                "rq1_03a",
+                "第5年末理论服务需求热力图",
+                "RQ1",
+                theoretical_summary_files,
+                "main_text",
+                str(exc),
+                "skipped_missing_data",
+            )
+        )
+    if theoretical_summary_df is not None:
+        heatmap = theoretical_summary_df.pivot(index="community", columns="service", values="theoretical_monthly_demand").sort_index()
+        fig, ax = plt.subplots(figsize=(style.figure_width + 1.2, style.figure_height + 0.6))
+        sns.heatmap(heatmap, cmap=style.cmap, annot=True, fmt=".0f", linewidths=0.5, cbar_kws={"label": "月需求次数 / 次"}, ax=ax)
+        ax.set_title("第5年末理论服务需求热力图")
+        ax.set_xlabel("服务类型")
+        ax.set_ylabel("小区")
+        outputs = save_figure(fig, "rq1_03a_theoretical_demand_heatmap", export_formats)
+        results.append(
+            generated_result(
+                "rq1_03a",
+                "第5年末理论服务需求热力图",
+                "RQ1",
+                theoretical_summary_files,
+                "main_text",
+                "与消费约束后需求图并排展示，可直接对比预算约束前后的理论需求与实现需求差异。",
+                heatmap.reset_index(),
+                outputs,
+            )
+        )
+
+    try:
         adjusted_summary_df, adjusted_summary_files = _load_adjusted_summary()
     except MissingDataError as exc:
         adjusted_summary_df = None
@@ -175,7 +220,7 @@ def build_rq1_plots(export_formats: list[str]) -> list[PlotResult]:
         results.append(
             skipped_result(
                 "rq1_03",
-                "第5年末服务需求热力图",
+                "第5年末消费约束后服务需求热力图",
                 "RQ1",
                 adjusted_summary_files,
                 "main_text",

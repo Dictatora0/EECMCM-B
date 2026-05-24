@@ -346,7 +346,7 @@ def q3_summary_row(
         "elderly_growth_rate": parameters["elderly_growth_rate"],
         "scheme_type": scheme_type,
         "station_plan": station_plan,
-        "served_population_coverage": summary["weighted_served_population_coverage"],
+        "served_population_coverage": summary["served_population_coverage"],
         "weighted_served_population_coverage": summary["weighted_served_population_coverage"],
         "served_demand_coverage": summary["served_demand_coverage"],
         "average_service_access_performance": summary["average_service_access_performance"],

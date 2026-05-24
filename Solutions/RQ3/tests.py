@@ -1357,6 +1357,13 @@ def test_pareto_selector_accepts_legacy_fairness_scheme_key() -> None:
     assert selected["scheme_label"] == "fairness_priority_scheme"
 
 
+def test_rq3_main_writes_canonical_satisfaction_aux_prefix() -> None:
+    text = Path(__file__).resolve().parent.joinpath("3_1.py").read_text(encoding="utf-8")
+    assert 'write_price_evaluation_bundle("3_1_aux_satisfaction_best_price_scheme", satisfaction_best)' in text
+    assert '"satisfaction_priority_scheme": "3_1_aux_satisfaction_best_price_scheme"' in text
+    assert "3_1_aux_fairness_best_price_scheme" not in text
+
+
 def test_pareto_notes_use_satisfaction_primary_wording() -> None:
     frontier_rows = [
         {

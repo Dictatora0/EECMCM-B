@@ -1,6 +1,8 @@
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+import json
 import sys
+import tempfile
 
 
 RQ4_DIR = Path(__file__).resolve().parent
@@ -11,6 +13,15 @@ if RQ4_SPEC is None or RQ4_SPEC.loader is None:
 RQ4_COMMON = module_from_spec(RQ4_SPEC)
 sys.modules[RQ4_SPEC.name] = RQ4_COMMON
 RQ4_SPEC.loader.exec_module(RQ4_COMMON)
+
+RQ4_MAIN_PATH = RQ4_DIR / "4_1.py"
+with RQ4_COMMON.temporarily_bind_common(RQ4_COMMON):
+    RQ4_MAIN_SPEC = spec_from_file_location("rq4_main_module", RQ4_MAIN_PATH)
+    if RQ4_MAIN_SPEC is None or RQ4_MAIN_SPEC.loader is None:
+        raise RuntimeError(f"Failed to load RQ4 main module from {RQ4_MAIN_PATH}")
+    RQ4_MAIN = module_from_spec(RQ4_MAIN_SPEC)
+    sys.modules[RQ4_MAIN_SPEC.name] = RQ4_MAIN
+    RQ4_MAIN_SPEC.loader.exec_module(RQ4_MAIN)
 
 ScenarioDefinition = RQ4_COMMON.ScenarioDefinition
 scenario_definitions = RQ4_COMMON.scenario_definitions
@@ -31,6 +42,8 @@ build_station_scale_map = RQ4_COMMON.build_station_scale_map
 build_station_plan_text = RQ4_COMMON.build_station_plan_text
 summarize_monte_carlo_metric = RQ4_COMMON.summarize_monte_carlo_metric
 q3_summary_row = RQ4_COMMON.q3_summary_row
+cache_is_current = RQ4_MAIN.cache_is_current
+build_unified_summary_rows = RQ4_MAIN.build_unified_summary_rows
 
 
 def test_scenario_config_contains_required_traceable_fields() -> None:
@@ -249,6 +262,127 @@ def test_q3_summary_row_contains_coverage_fields() -> None:
     assert row["weighted_served_population_coverage"] == 0.8
 
 
+def test_cache_is_current_rejects_legacy_alpha_and_overflow_payload() -> None:
+    legacy_payload = {
+        "cache_version": RQ4_COMMON.CACHE_VERSION,
+        "financial_best_summary": {
+            "pricing_model": "station_service_level_pricing",
+            "pricing_formula": "p_{j,r}=alpha_j*p_r^0,r=1,...,5; p_{j,6}=0",
+        },
+        "fairness_best_summary": {
+            "pricing_model": "station_service_level_pricing",
+            "pricing_formula": "p_{j,r}=alpha_j*p_r^0,r=1,...,5; p_{j,6}=0",
+        },
+        "coordination_note": "老人仍选择满意度最高的主服务站。容量不足时，协同站点分流表示由主站或街道平台进行派单协同，不表示老人自主改选其他站点。",
+        "financial_best_community_results": [{"community": "A", "overflow_station": "B"}],
+        "satisfaction_best_community_results": [{"community": "A", "overflow_station": ""}],
+    }
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = Path(tmpdir) / "legacy.json"
+        path.write_text(json.dumps(legacy_payload, ensure_ascii=False), encoding="utf-8")
+        assert cache_is_current(path) is False
+
+
+def test_cache_is_current_accepts_current_single_station_payload() -> None:
+    current_payload = {
+        "cache_version": RQ4_COMMON.CACHE_VERSION,
+        "financial_best_summary": {
+            "pricing_model": "station_service_level_pricing",
+            "pricing_formula": "p_{j,r} independent for r=1,...,5; p_{j,6}=0",
+        },
+        "satisfaction_best_summary": {
+            "pricing_model": "station_service_level_pricing",
+            "pricing_formula": "p_{j,r} independent for r=1,...,5; p_{j,6}=0",
+        },
+        "financial_best_community_results": [{"community": "A", "overflow_station": ""}],
+        "satisfaction_best_community_results": [{"community": "A", "overflow_station": ""}],
+    }
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = Path(tmpdir) / "current.json"
+        path.write_text(json.dumps(current_payload, ensure_ascii=False), encoding="utf-8")
+        assert cache_is_current(path) is True
+
+
+def test_rq4_source_uses_single_station_ratio_wording() -> None:
+    text = RQ4_MAIN_PATH.read_text(encoding="utf-8")
+    assert "不再分流至第二站" in text
+    assert "协同站点分流" not in text
+
+
+def test_build_unified_summary_rows_reads_canonical_satisfaction_stability_field() -> None:
+    scenario = ScenarioDefinition("S4", "预算提高", {"budget_limit": 140.0})
+    result_map = {
+        "S4": {
+            "scenario_name": "预算提高",
+            "execution_path": "reuse_rq1_rerun_rq2_rq3",
+            "scenario_parameters": {
+                "budget_limit": 140.0,
+                "fixed_cost_multiplier": 1.0,
+                "p12": 0.045,
+                "p23": 0.10,
+                "elderly_growth_rate": 0.07,
+            },
+            "q2_best_station_plan": "A-小型;C-中型",
+            "q2_best_summary": {
+                "build_cost_wan": 138.0,
+                "served_demand_coverage": 0.85,
+                "average_service_access_performance": 0.83,
+                "minimum_service_access_performance": 0.77,
+                "capacity_safety_rate": 0.5,
+                "max_station_utilization": 0.91,
+                "fully_safe": 0,
+            },
+            "financial_best_summary": {
+                "subsidy_policy": "none",
+                "pareto_rank": 1,
+                "annual_government_subsidy": 1000.0,
+                "annual_net_profit": 500.0,
+                "profit_rate": 0.02,
+                "average_service_access_performance": 0.8,
+                "minimum_service_access_performance": 0.75,
+                "profit_compliant": 1,
+                "converged": 1,
+            },
+            "satisfaction_best_summary": {
+                "subsidy_policy": "none",
+                "pareto_rank": 2,
+                "annual_government_subsidy": 1200.0,
+                "annual_net_profit": -50.0,
+                "profit_rate": -0.002,
+                "average_service_access_performance": 0.86,
+                "minimum_service_access_performance": 0.8,
+                "profit_compliant": 0,
+                "converged": 1,
+            },
+            "joint_feasible_solution_exists": False,
+        }
+    }
+    sensitivity_rows = [
+        {
+            "scenario": "S4",
+            "metric": "q2_served_demand_coverage",
+            "sensitivity_coefficient": 0.3,
+            "sensitivity_level": "medium",
+            "perturbed_parameter": "budget_limit",
+        }
+    ]
+    robustness_rows = [
+        {
+            "scenario": "S4",
+            "RS_loc": 0.75,
+            "RS_layout": 0.5,
+            "served_demand_coverage_stability": 0.95,
+            "q3_financial_scheme_performance_stability": 0.96,
+            "q3_satisfaction_scheme_performance_stability": 0.97,
+            "financial_compliance_rate": 0.5,
+            "capacity_safety_rate": 0.75,
+        }
+    ]
+    rows = build_unified_summary_rows([scenario], result_map, sensitivity_rows, robustness_rows)
+    assert len(rows) == 1
+    assert rows[0]["q3_satisfaction_scheme_performance_stability"] == 0.97
+
+
 def run_all_tests() -> None:
     tests = [
         test_scenario_config_contains_required_traceable_fields,
@@ -262,6 +396,10 @@ def run_all_tests() -> None:
         test_q2_progress_plan_text_should_be_built_from_station_mapping,
         test_monte_carlo_metric_summary_reports_mean_quantiles_and_risk,
         test_q3_summary_row_contains_coverage_fields,
+        test_cache_is_current_rejects_legacy_alpha_and_overflow_payload,
+        test_cache_is_current_accepts_current_single_station_payload,
+        test_rq4_source_uses_single_station_ratio_wording,
+        test_build_unified_summary_rows_reads_canonical_satisfaction_stability_field,
     ]
     for test in tests:
         test()

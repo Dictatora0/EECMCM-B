@@ -333,15 +333,15 @@ def audit_rq3(rows: list[AuditRow]) -> None:
     main_station_path = RQ3_DIR / "outputs" / "3_1_best_price_scheme_stations.csv"
     aux_summary_paths = [
         RQ3_DIR / "outputs" / "3_1_aux_financial_best_price_scheme_summary.csv",
-        RQ3_DIR / "outputs" / "3_1_aux_fairness_best_price_scheme_summary.csv",
+        RQ3_DIR / "outputs" / "3_1_aux_satisfaction_best_price_scheme_summary.csv",
     ]
     aux_community_paths = [
         RQ3_DIR / "outputs" / "3_1_aux_financial_best_price_scheme_communities.csv",
-        RQ3_DIR / "outputs" / "3_1_aux_fairness_best_price_scheme_communities.csv",
+        RQ3_DIR / "outputs" / "3_1_aux_satisfaction_best_price_scheme_communities.csv",
     ]
     aux_station_paths = [
         RQ3_DIR / "outputs" / "3_1_aux_financial_best_price_scheme_stations.csv",
-        RQ3_DIR / "outputs" / "3_1_aux_fairness_best_price_scheme_stations.csv",
+        RQ3_DIR / "outputs" / "3_1_aux_satisfaction_best_price_scheme_stations.csv",
     ]
     base_price, _direct_cost = load_base_price_and_cost()
     q2_summary = read_csv_rows(RQ2_DIR / "outputs" / "2_1_best_scheme_summary.csv")
@@ -383,7 +383,7 @@ def audit_rq3(rows: list[AuditRow]) -> None:
     ]
     stale_legacy = [path.name for path in legacy_paths if path.exists()]
     if stale_legacy:
-        add(rows, WARN, P1, "RQ3 legacy output names", RQ3_DIR / "outputs", "legacy_files", f"发现旧双主方案命名残留：{stale_legacy[:4]}。", "清理旧 `3_1_financial_*` / `3_1_fairness_*` 输出，避免与主结果混淆。")
+        add(rows, WARN, P1, "RQ3 legacy output names", RQ3_DIR / "outputs", "legacy_files", f"发现旧双主方案命名残留：{stale_legacy[:4]}。", "清理旧 `3_1_financial_*` / `3_1_fairness_*` / `3_1_aux_fairness_*` 输出，避免与主结果混淆。")
     else:
         add(rows, PASS, P1, "RQ3 legacy output names", RQ3_DIR / "outputs", "legacy_files", "未发现旧双主方案命名残留。", "保持不变。")
 

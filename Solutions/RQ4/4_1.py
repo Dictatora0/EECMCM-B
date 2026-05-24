@@ -408,7 +408,7 @@ def build_rq3_inputs(
             "source": "RQ4",
             "scenario": scenario.code,
             "execution_path": scenario_execution_path(scenario),
-            "coordination_note": "老人仍选择满意度最高的主服务站。容量不足时，协同站点分流表示由主站或街道平台进行派单协同，不表示老人自主改选其他站点。",
+            "coordination_note": single_station_ratio_note(),
         },
         year5_population=year5_population,
         adjusted_demand_summary=adjusted_summary,
@@ -461,6 +461,10 @@ def solve_rq3_under_scenario(rq3_inputs) -> tuple[object, object, bool]:
         RQ3_MAIN.select_satisfaction_best(all_evaluations),
         RQ3_MAIN.joint_feasible_solution_exists(all_evaluations),
     )
+
+
+def single_station_ratio_note() -> str:
+    return "老人只选择满意度最高的唯一主服务站。若主站容量不足，则按站点统一承接比例服务，未承接部分直接计入 unmet，不再分流至第二站。"
 
 
 def community_results_rows(evaluation) -> list[dict[str, object]]:
@@ -540,11 +544,11 @@ def solve_scenario(
         "satisfaction_best_community_results": community_results_rows(satisfaction_best),
         "joint_feasible_solution_exists": bool(joint_feasible),
         "joint_feasible_summary": (
-            "存在同时满足财务合规、公平可及阈值与收敛要求的方案。"
+            "存在同时满足财务合规、满意度阈值与收敛要求的方案。"
             if joint_feasible
-            else "在当前预算、补贴上限和服务需求下，调价无法同时实现财务合规与公平可及，需要追加补贴、扩容或专项公益服务补贴。"
+            else "在当前预算、补贴上限和服务需求下，调价无法同时实现财务合规与满意度阈值，需要追加补贴、扩容或专项公益服务补贴。"
         ),
-        "coordination_note": "老人仍选择满意度最高的主服务站。容量不足时，协同站点分流表示由主站或街道平台进行派单协同，不表示老人自主改选其他站点。",
+        "coordination_note": single_station_ratio_note(),
     }
     add_legacy_fairness_summary_keys(
         result_payload,
@@ -608,7 +612,34 @@ def cache_is_current(path: Path) -> bool:
         payload = read_json(path)
     except Exception:
         return False
-    return payload.get("cache_version") == CACHE_VERSION
+    if payload.get("cache_version") != CACHE_VERSION:
+        return False
+
+    expected_pricing_model = "station_service_level_pricing"
+    expected_pricing_formula = "p_{j,r} independent for r=1,...,5; p_{j,6}=0"
+    for key in ("financial_best_summary", "satisfaction_best_summary"):
+        summary = payload.get(key)
+        if not isinstance(summary, dict):
+            return False
+        if summary.get("pricing_model") != expected_pricing_model:
+            return False
+        if summary.get("pricing_formula") != expected_pricing_formula:
+            return False
+
+    note = payload.get("coordination_note")
+    if note not in (None, "", single_station_ratio_note()):
+        return False
+
+    for key in ("financial_best_community_results", "satisfaction_best_community_results"):
+        rows = payload.get(key)
+        if not isinstance(rows, list):
+            return False
+        for row in rows:
+            if not isinstance(row, dict):
+                return False
+            if str(row.get("overflow_station", "")).strip():
+                return False
+    return True
 
 
 def solve_and_cache_scenarios(scenarios: list[ScenarioDefinition]) -> dict[str, dict[str, object]]:
@@ -901,7 +932,7 @@ def build_unified_summary_rows(
                 "RS_layout": robustness["RS_layout"],
                 "served_demand_coverage_stability": robustness["served_demand_coverage_stability"],
                 "q3_financial_scheme_performance_stability": robustness["q3_financial_scheme_performance_stability"],
-                "q3_satisfaction_scheme_performance_stability": robustness["q3_fairness_scheme_performance_stability"],
+                "q3_satisfaction_scheme_performance_stability": robustness["q3_satisfaction_scheme_performance_stability"],
                 "financial_compliance_rate": robustness["financial_compliance_rate"],
                 "capacity_safety_rate": robustness["capacity_safety_rate"],
                 "dominant_sensitivity_metric": dominant_sensitivity["metric"],
@@ -1038,7 +1069,7 @@ def write_interpretation_notes(
         "## 4. 固定成本上升对价格、利润和满意度的传导",
         "",
         "- 固定管理成本上升不会改变 RQ1 需求，但会抬高 Q2/Q3 的年度固定成本。",
-        "- 在 Q3 中，这会增加盈利压力，可能引致更高溢价、利润率下降或公平方案财政缺口扩大，并通过价格满意度影响服务绩效。",
+        "- 在 Q3 中，这会增加盈利压力，可能引致更高溢价、利润率下降或满意度优先方案财政缺口扩大，并通过价格满意度影响服务绩效。",
         "",
         "## 5. 老人增长率提高但布局若稳定，应如何解释容量冗余",
         "",
@@ -1054,11 +1085,11 @@ def write_interpretation_notes(
         "",
         "- 不能再直接写“预算提高无效”，除非 `S4` 修复后的真实重算结果仍支持该结论。",
         "- 不能把 Q2 的服务绩效稳定性冒充 Q3 双方案的绩效稳定性。",
-        "- 不能把 `financial_sustainable_scheme` 或 `fairness_priority_scheme` 强行描述为唯一最优方案；若 `joint_feasible_solution_exists = false`，必须明确财务合规与公平可及当前不可兼得。",
+        "- 不能把 `financial_sustainable_scheme` 或 `satisfaction_priority_scheme` 强行描述为唯一最优方案；若 `joint_feasible_solution_exists = false`，必须明确财务合规与满意度阈值当前不可兼得。",
         "",
-        "## 8. 协同分流口径说明",
+        "## 8. 单站选择与比例承接口径",
         "",
-        "- 老人仍选择满意度最高的主服务站。容量不足时，协同站点分流表示由主站或街道平台进行派单协同，不表示老人自主改选其他站点。",
+        f"- {single_station_ratio_note()}",
     ]
     (OUTPUT_DIR / "4_interpretation_notes.md").write_text("\n".join(lines), encoding="utf-8")
 

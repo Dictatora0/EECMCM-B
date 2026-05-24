@@ -1,7 +1,9 @@
 from pathlib import Path
 import csv
 import os
+import subprocess
 import tempfile
+import warnings
 
 
 _MPL_DIR = Path(__file__).resolve().parent / "outputs" / ".mplconfig"
@@ -503,6 +505,192 @@ def test_rq3_builder_skips_satisfaction_plots_when_only_access_fields_exist() ->
     assert by_id["rq3_03"].status == "skipped_missing_data"
 
 
+def test_rq1_builder_generates_theoretical_and_adjusted_demand_heatmaps() -> None:
+    import plot_rq1
+
+    with tempfile.TemporaryDirectory() as tmp:
+        outputs = Path(tmp) / "Solutions" / "RQ1" / "outputs"
+        outputs.mkdir(parents=True)
+        (outputs / "1_1_high_precision_population_by_year.csv").write_text(
+            "year,community,self_care,semi_disabled,disabled\n"
+            "5,A,100,20,10\n"
+            "5,B,90,18,9\n",
+            encoding="utf-8",
+        )
+        (outputs / "1_2_high_precision_theoretical_demand.csv").write_text(
+            "community,service,theoretical_monthly_demand\n"
+            "A,助餐,120\n"
+            "A,助浴,30\n"
+            "B,助餐,100\n"
+            "B,助浴,20\n",
+            encoding="utf-8",
+        )
+        (outputs / "1_3_high_precision_adjusted_demand.csv").write_text(
+            "community,service,adjusted_monthly_demand\n"
+            "A,助餐,110\n"
+            "A,助浴,25\n"
+            "B,助餐,95\n"
+            "B,助浴,18\n",
+            encoding="utf-8",
+        )
+        (outputs / "1_3_high_precision_adjusted_demand_detail.csv").write_text(
+            "community,care_level,service,adjustment_scale,adjusted_monthly_demand\n"
+            "A,self_care,助餐,0.9,50\n",
+            encoding="utf-8",
+        )
+        (outputs / "1_4_transition_matrix.csv").write_text(
+            "target_state,self_care,semi_disabled,disabled\n"
+            "self_care_next,0.9,0.0,0.0\n"
+            "semi_disabled_next,0.1,0.8,0.0\n"
+            "disabled_next,0.0,0.2,1.0\n",
+            encoding="utf-8",
+        )
+        (outputs / "1_4_validation_sensitivity_summary.csv").write_text(
+            "case,year5_elderly_total,year5_disabled_share,theoretical_total_monthly_demand,adjusted_total_monthly_demand,matrix_equivalence_max_abs_diff\n"
+            "baseline,100,0.1,150,130,0.0\n"
+            "growth_plus_10pct,110,0.11,160,140,0.0\n",
+            encoding="utf-8",
+        )
+        original_output = plot_rq1.RQ1_OUTPUT
+        plot_rq1.RQ1_OUTPUT = outputs
+        try:
+            results = plot_rq1.build_rq1_plots(["png"])
+        finally:
+            plot_rq1.RQ1_OUTPUT = original_output
+
+    by_id = {item.figure_id: item for item in results}
+    assert by_id["rq1_03a"].status == "generated"
+    assert by_id["rq1_03a"].title_cn == "第5年末理论服务需求热力图"
+    assert by_id["rq1_03a"].recommended_location == "main_text"
+    assert by_id["rq1_03"].status == "generated"
+    assert by_id["rq1_03"].title_cn == "第5年末消费约束后服务需求热力图"
+
+
+def test_rq2_extension_plots_use_appendix_location_and_current_profit_field() -> None:
+    import plot_rq2
+
+    with tempfile.TemporaryDirectory() as tmp:
+        outputs = Path(tmp) / "Solutions" / "RQ2" / "outputs"
+        outputs.mkdir(parents=True)
+        (outputs / "2_1_best_scheme_summary.csv").write_text(
+            "scheme_detail,geographic_population_coverage,served_population_coverage,weighted_served_population_coverage,served_demand_coverage,scheme_type\n"
+            "A-小型,0.8,0.7,0.7,0.6,coverage_fairness_capacity_milp\n",
+            encoding="utf-8",
+        )
+        (outputs / "2_1_best_scheme_stations.csv").write_text(
+            "station_community,utilization,scale,annual_revenue,annual_subsidy,annual_direct_cost,annual_fixed_cost,annual_depreciation,annual_net_profit\n"
+            "A,0.7,小型,100,10,50,20,5,35\n",
+            encoding="utf-8",
+        )
+        (outputs / "2_1_best_scheme_allocations.csv").write_text(
+            "community,primary_station,overflow_station,service_access_performance,demand_service_ratio,primary_load_daily,overflow_load_daily\n"
+            "A,A,,0.8,0.9,100,0\n",
+            encoding="utf-8",
+        )
+        (outputs / "2_2_pareto_frontier.csv").write_text(
+            "scheme_label,served_population_coverage,weighted_served_population_coverage,served_demand_coverage,average_service_access_performance,minimum_service_access_performance,capacity_safety_rate,max_station_utilization,annual_net_profit_after_policy_subsidy,profit_compliant\n"
+            "pareto_1,0.8,0.8,0.75,0.7,0.5,0.1,0.9,120000,1\n",
+            encoding="utf-8",
+        )
+        (outputs / "2_2_epsilon_constraint_summary.csv").write_text(
+            "epsilon_min_access_threshold,epsilon_feasible_count,average_service_access_performance,minimum_service_access_performance,annual_net_profit_after_policy_subsidy\n"
+            "0.4,10,0.7,0.5,120000\n",
+            encoding="utf-8",
+        )
+        original_output = plot_rq2.RQ2_OUTPUT
+        original_distance = plot_rq2.DISTANCE_XLSX
+        plot_rq2.RQ2_OUTPUT = outputs
+        plot_rq2.DISTANCE_XLSX = outputs / "fake_distance.xlsx"
+        original_topology = plot_rq2.load_distance_topology
+        plot_rq2.load_distance_topology = lambda _path: __import__("pandas").DataFrame(
+            [{"community": "A", "x": 0.0, "y": 0.0}]
+        )
+        try:
+            results = plot_rq2.build_rq2_plots(["png"])
+        finally:
+            plot_rq2.RQ2_OUTPUT = original_output
+            plot_rq2.DISTANCE_XLSX = original_distance
+            plot_rq2.load_distance_topology = original_topology
+
+    by_id = {item.figure_id: item for item in results}
+    assert by_id["rq2_07"].status == "generated"
+    assert by_id["rq2_07"].recommended_location == "appendix"
+    assert by_id["rq2_08"].status == "generated"
+    assert by_id["rq2_08"].recommended_location == "appendix"
+
+
+def test_rq3_satisfaction_plots_use_explicit_average_and_minimum_titles() -> None:
+    import plot_rq3
+    import pandas as pd
+    from data_loader import MODULE_OUTPUT_DIRS
+
+    frontier = pd.DataFrame(
+        [
+            {
+                "annual_net_profit": 120000.0,
+                "annual_net_profit_wan": 12.0,
+                "average_service_satisfaction": 0.82,
+                "minimum_service_satisfaction": 0.71,
+                "average_service_access_performance": 0.66,
+                "minimum_service_access_performance": 0.42,
+                "profit_rate": 0.03,
+                "profit_compliant": 1,
+                "converged": 1,
+            }
+        ]
+    )
+    representative = pd.DataFrame(
+        [
+            {
+                "representative_label": "frontier_satisfaction_peak",
+                "annual_net_profit_wan": 12.0,
+                "minimum_service_satisfaction": 0.71,
+                "minimum_service_access_performance": 0.42,
+                "profit_rate": 0.03,
+                "converged": 1,
+            }
+        ]
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        outputs = Path(tmp) / "Solutions" / "RQ3" / "outputs"
+        outputs.mkdir(parents=True)
+        original = MODULE_OUTPUT_DIRS["RQ3"]
+        MODULE_OUTPUT_DIRS["RQ3"] = outputs
+        original_read_module_output = plot_rq3.read_module_output
+
+        def fake_read_module_output(module: str, candidate_keywords: list[list[str]], required_columns: list[str]):
+            if required_columns == [
+                "annual_net_profit",
+                "average_service_satisfaction",
+                "minimum_service_satisfaction",
+                "profit_compliant",
+                "converged",
+            ]:
+                return frontier, outputs / "3_1_aux_pareto_frontier.csv"
+            if required_columns == [
+                "representative_label",
+                "annual_net_profit_wan",
+                "minimum_service_satisfaction",
+                "converged",
+            ]:
+                return representative, outputs / "3_2_aux_pareto_representative_schemes.csv"
+            raise plot_rq3.MissingDataError("skip unrelated test branches")
+
+        plot_rq3.read_module_output = fake_read_module_output
+        try:
+            results = plot_rq3.build_rq3_plots(["png"])
+        finally:
+            plot_rq3.read_module_output = original_read_module_output
+            MODULE_OUTPUT_DIRS["RQ3"] = original
+
+    by_id = {item.figure_id: item for item in results}
+    assert by_id["rq3_02"].title_cn == "问题3社区平均老人满意度前沿图"
+    assert "社区平均老人满意度" in by_id["rq3_02"].reason
+    assert by_id["rq3_03"].title_cn == "问题3最低老人满意度边界图"
+    assert "最低老人满意度边界" in by_id["rq3_03"].reason
+
+
 def test_rq4_builder_skips_when_outputs_missing() -> None:
     from plot_rq4 import build_rq4_plots
     from data_loader import MODULE_OUTPUT_DIRS
@@ -612,6 +800,116 @@ def test_rq2_loaders_enforce_plot_contract_fields() -> None:
     assert "overflow_load_daily" in allocations.columns
 
 
+def test_rq3_stability_plot_keeps_epsilon_as_access_threshold() -> None:
+    import plot_rq3
+
+    text = Path(plot_rq3.__file__).read_text(encoding="utf-8")
+    assert "可及绩效阈值与财政缺口" in text
+    assert "最低可及绩效阈值 ε" in text
+    assert "可及绩效阈值与服务可及绩效" in text
+    assert "满意度阈值与财政缺口" not in text
+    assert "最低满意度阈值 ε" not in text
+
+
+def test_plot_config_prefers_songti_sc_when_available() -> None:
+    import plot_config
+
+    original = plot_config._available_font_names
+    plot_config._available_font_names = lambda: {"Songti SC", "SimSun", "Arial Unicode MS"}
+    try:
+        style = plot_config.get_plot_style()
+    finally:
+        plot_config._available_font_names = original
+
+    assert style.font_cn == "Songti SC"
+
+
+def test_plot_config_import_avoids_default_matplotlib_cache_warning() -> None:
+    result = subprocess.run(
+        [
+            "python3",
+            "-c",
+            (
+                "import sys; "
+                "sys.path.insert(0, 'Solutions/plots'); "
+                "import plot_config; "
+                "print(plot_config.MPLCONFIGDIR)"
+            ),
+        ],
+        cwd="/Users/lifulin/Desktop/B",
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    stderr = result.stderr.strip()
+    assert "not a writable directory" not in stderr
+    assert "temporary cache directory" not in stderr
+
+
+def test_rq1_builder_configures_songti_sc_without_glyph_warnings() -> None:
+    import matplotlib
+    import plot_rq1
+
+    with tempfile.TemporaryDirectory() as tmp:
+        outputs = Path(tmp) / "Solutions" / "RQ1" / "outputs"
+        outputs.mkdir(parents=True)
+        (outputs / "1_1_high_precision_population_by_year.csv").write_text(
+            "year,community,self_care,semi_disabled,disabled\n"
+            "5,A,100,20,10\n"
+            "5,B,90,18,9\n",
+            encoding="utf-8",
+        )
+        (outputs / "1_2_high_precision_theoretical_demand.csv").write_text(
+            "community,service,theoretical_monthly_demand\n"
+            "A,助餐,120\n"
+            "A,助浴,30\n"
+            "B,助餐,100\n"
+            "B,助浴,20\n",
+            encoding="utf-8",
+        )
+        (outputs / "1_3_high_precision_adjusted_demand.csv").write_text(
+            "community,service,adjusted_monthly_demand\n"
+            "A,助餐,110\n"
+            "A,助浴,25\n"
+            "B,助餐,95\n"
+            "B,助浴,18\n",
+            encoding="utf-8",
+        )
+        (outputs / "1_3_high_precision_adjusted_demand_detail.csv").write_text(
+            "community,care_level,service,adjustment_scale,adjusted_monthly_demand\n"
+            "A,self_care,助餐,0.9,50\n",
+            encoding="utf-8",
+        )
+        (outputs / "1_4_transition_matrix.csv").write_text(
+            "target_state,self_care,semi_disabled,disabled\n"
+            "self_care_next,0.9,0.0,0.0\n"
+            "semi_disabled_next,0.1,0.8,0.0\n"
+            "disabled_next,0.0,0.2,1.0\n",
+            encoding="utf-8",
+        )
+        (outputs / "1_4_validation_sensitivity_summary.csv").write_text(
+            "case,year5_elderly_total,year5_disabled_share,theoretical_total_monthly_demand,adjusted_total_monthly_demand,matrix_equivalence_max_abs_diff\n"
+            "baseline,100,0.1,150,130,0.0\n"
+            "growth_plus_10pct,110,0.11,160,140,0.0\n",
+            encoding="utf-8",
+        )
+        original_output = plot_rq1.RQ1_OUTPUT
+        plot_rq1.RQ1_OUTPUT = outputs
+        matplotlib.rcParams["font.family"] = ["DejaVu Sans"]
+        matplotlib.rcParams["font.sans-serif"] = ["DejaVu Sans"]
+        try:
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                plot_rq1.build_rq1_plots(["png"])
+        finally:
+            plot_rq1.RQ1_OUTPUT = original_output
+
+    messages = [str(item.message) for item in caught]
+    assert any("Songti SC" == str(font) for font in matplotlib.rcParams["font.family"])
+    assert not any("Glyph" in message for message in messages)
+
+
 def run_all_tests() -> None:
     tests = [
         test_find_output_file_prefers_priority_keywords,
@@ -623,13 +921,24 @@ def run_all_tests() -> None:
         test_first_present_column_returns_first_existing_candidate,
         test_label_map_outputs_human_readable_chinese,
         test_rq3_representative_fallback_builds_from_frontier,
+        test_rq3_representative_fallback_keeps_satisfaction_peak_label,
+        test_rq3_representative_fallback_requires_satisfaction_columns,
         test_rq3_select_service_level_scheme_prefers_joint_feasible_label,
         test_rq3_parse_station_service_prices_returns_long_frame,
         test_find_output_file_prefers_newer_when_priority_equal,
         test_rq3_builder_skips_when_outputs_missing,
+        test_rq3_builder_skips_satisfaction_plots_when_only_access_fields_exist,
+        test_rq1_builder_generates_theoretical_and_adjusted_demand_heatmaps,
+        test_rq2_extension_plots_use_appendix_location_and_current_profit_field,
+        test_rq3_satisfaction_plots_use_explicit_average_and_minimum_titles,
         test_rq4_builder_skips_when_outputs_missing,
         test_notes_replace_generic_missing_reason,
         test_rq4_fallback_merge_from_q2_q3_summaries,
+        test_rq2_loaders_enforce_plot_contract_fields,
+        test_rq3_stability_plot_keeps_epsilon_as_access_threshold,
+        test_plot_config_prefers_songti_sc_when_available,
+        test_plot_config_import_avoids_default_matplotlib_cache_warning,
+        test_rq1_builder_configures_songti_sc_without_glyph_warnings,
     ]
     for test in tests:
         test()

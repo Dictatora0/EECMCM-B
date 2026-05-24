@@ -2447,7 +2447,7 @@ def write_expanded_search_notes(
         if scenario == "S0":
             lines.append("- S0 重点观察 G、I 等亏损边界站点；若仍不可行，说明基准预算下容量与收益结构仍不足以支撑逐站保本微利。")
         if scenario == "S4":
-            lines.append("- S4 重点观察 C 站 8% 上界与 J 站保本下界；若仍不可行，说明扩容虽改善公平可及性，但逐站财务边界仍未同时满足。")
+            lines.append("- S4 重点观察 C 站 8% 上界与 J 站保本下界；若仍不可行，说明扩容虽改善最低服务可及绩效，但逐站财务边界仍未同时满足。")
         lines.append("")
     (OUTPUT_DIR / "3_5_expanded_search_notes.md").write_text("\n".join(lines), encoding="utf-8")
 
@@ -2595,7 +2595,6 @@ def select_service_level_schemes(
         "joint_feasible_best_satisfaction": best_joint,
         "financial_best": financial_best,
         "satisfaction_best": satisfaction_best,
-        "fairness_best": satisfaction_best,
     }
 
 
@@ -3186,7 +3185,7 @@ def main(
 
     write_price_evaluation_bundle("3_1_best_price_scheme", financial_best)
     write_price_evaluation_bundle("3_1_aux_financial_best_price_scheme", financial_best)
-    write_price_evaluation_bundle("3_1_aux_fairness_best_price_scheme", satisfaction_best)
+    write_price_evaluation_bundle("3_1_aux_satisfaction_best_price_scheme", satisfaction_best)
     write_csv(
         OUTPUT_DIR / "3_1_aux_top_price_schemes.csv",
         [evaluation_summary_row(item) for item in ranked[:10]],
@@ -3223,7 +3222,7 @@ def main(
         [
             {
                 "financial_sustainable_scheme": "3_1_aux_financial_best_price_scheme",
-                "satisfaction_priority_scheme": "3_1_aux_fairness_best_price_scheme",
+                "satisfaction_priority_scheme": "3_1_aux_satisfaction_best_price_scheme",
                 "joint_feasible_solution_exists": int(joint_feasible),
                 "summary": (
                     "存在同时满足财务合规、满意度阈值与收敛要求的方案。"

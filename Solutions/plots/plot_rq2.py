@@ -10,7 +10,7 @@ import seaborn as sns
 from data_loader import MissingDataError, read_first_existing
 from label_maps import pretty_metric_label, pretty_scheme_label
 from layout_utils import load_distance_topology, parse_station_plan, station_size_value
-from plot_config import ROOT, get_plot_style
+from plot_config import ROOT, ensure_matplotlib_configured
 from plot_utils import PlotResult, generated_result, is_low_information_series, save_figure, save_plotly_figure, skipped_result
 
 
@@ -24,14 +24,35 @@ def _load_best_summary() -> tuple[pd.DataFrame, list[str]]:
 
 
 def _load_best_stations() -> tuple[pd.DataFrame, list[str]]:
-    frame, path = read_first_existing([RQ2_OUTPUT / "2_1_best_scheme_stations.csv"], required_columns=["station_community", "utilization", "scale"])
+    frame, path = read_first_existing(
+        [RQ2_OUTPUT / "2_1_best_scheme_stations.csv"],
+        required_columns=[
+            "station_community",
+            "utilization",
+            "scale",
+            "annual_revenue",
+            "annual_subsidy",
+            "annual_direct_cost",
+            "annual_fixed_cost",
+            "annual_depreciation",
+            "annual_net_profit",
+        ],
+    )
     return frame, [str(path)]
 
 
 def _load_best_allocations() -> tuple[pd.DataFrame, list[str]]:
     frame, path = read_first_existing(
         [RQ2_OUTPUT / "2_1_best_scheme_allocations.csv"],
-        required_columns=["community", "primary_station", "overflow_station", "service_access_performance", "demand_service_ratio"],
+        required_columns=[
+            "community",
+            "primary_station",
+            "overflow_station",
+            "service_access_performance",
+            "demand_service_ratio",
+            "primary_load_daily",
+            "overflow_load_daily",
+        ],
     )
     return frame, [str(path)]
 
@@ -183,7 +204,7 @@ def _load_capacity_bottleneck() -> tuple[pd.DataFrame, list[str]]:
 
 def build_rq2_plots(export_formats: list[str]) -> list[PlotResult]:
     results: list[PlotResult] = []
-    style = get_plot_style()
+    style = ensure_matplotlib_configured()
 
     try:
         summary_df, summary_files = _load_best_summary()
@@ -425,10 +446,10 @@ def build_rq2_plots(export_formats: list[str]) -> list[PlotResult]:
     ax.bar(access["community"], access["service_access_performance"], color=style.colors[2], width=0.65, label="服务可及绩效")
     if "service_satisfaction" in access.columns:
         ax.plot(access["community"], access["service_satisfaction"], color=style.colors[1], marker="o", linewidth=1.8, label="服务满意度")
-        reason = "用于展示社区层面的服务公平性和差异，并叠加满意度辅助解释。"
+        reason = "用于展示社区层面的服务可及差异，并叠加满意度辅助解释。"
         title = "各小区服务可及绩效与满意度"
     else:
-        reason = "用于展示社区层面的服务公平性和差异；当前结果缺少满意度列，因此仅保留可及绩效主指标。"
+        reason = "用于展示社区层面的服务可及差异；当前结果缺少满意度列，因此仅保留可及绩效主指标。"
         title = "各小区服务可及绩效对比"
     ax.set_ylim(0, 1.05)
     ax.set_title(title)
@@ -543,7 +564,7 @@ def build_rq2_plots(export_formats: list[str]) -> list[PlotResult]:
                 "RQ2",
                 pareto_files,
                 "appendix",
-                "用于补充说明问题2在容量安全、利润合规约束下的布局权衡，适合作为扩展结果图。",
+                "用于补充说明问题2在容量安全、利润合规约束下的布局权衡，属于扩展分析图，不替代主结论图。",
                 frontier,
                 outputs,
             )
@@ -555,7 +576,7 @@ def build_rq2_plots(export_formats: list[str]) -> list[PlotResult]:
         results.append(
             skipped_result(
                 "rq2_08",
-                "公平阈值变化下的可行方案与绩效",
+                "最低可及绩效阈值变化下的可行方案与绩效",
                 "RQ2",
                 [],
                 "appendix",
@@ -573,7 +594,7 @@ def build_rq2_plots(export_formats: list[str]) -> list[PlotResult]:
             color=style.colors[0],
             ax=axes[0],
         )
-        axes[0].set_title("公平阈值与可行方案数量")
+        axes[0].set_title("最低可及绩效阈值与可行方案数量")
         axes[0].set_xlabel("最低可及性阈值 ε")
         axes[0].set_ylabel("可行方案数量")
         epsilon_valid = epsilon_plot[epsilon_plot["epsilon_feasible_count"] > 0].copy()
@@ -594,7 +615,7 @@ def build_rq2_plots(export_formats: list[str]) -> list[PlotResult]:
             palette=style.colors[1:3],
             ax=axes[1],
         )
-        axes[1].set_title("公平阈值与代表方案绩效")
+        axes[1].set_title("最低可及绩效阈值与代表方案绩效")
         axes[1].set_xlabel("最低可及性阈值 ε")
         axes[1].set_ylabel("指标值")
         axes[1].legend(frameon=False, title="")
@@ -602,11 +623,11 @@ def build_rq2_plots(export_formats: list[str]) -> list[PlotResult]:
         results.append(
             generated_result(
                 "rq2_08",
-                "公平阈值变化下的可行方案与绩效",
+                "最低可及绩效阈值变化下的可行方案与绩效",
                 "RQ2",
                 epsilon_files,
                 "appendix",
-                "将公平阈值提高后可行空间快速缩小，同时可直观看到最低可及性门槛对代表方案绩效的牵引。",
+                "将最低可及绩效阈值提高后可行空间快速缩小，同时可直观看到最低可及性门槛对代表方案绩效的牵引，属于扩展分析图，不替代主结论图。",
                 epsilon_plot,
                 outputs,
             )
@@ -664,7 +685,7 @@ def build_rq2_plots(export_formats: list[str]) -> list[PlotResult]:
                     "RQ2",
                     bottleneck_files,
                     "appendix",
-                    "从容量约束最紧的候选方案中筛出代表样本，辅助解释为什么部分布局在公平底线下仍受容量卡住。",
+                    "从容量约束最紧的候选方案中筛出代表样本，辅助解释为什么部分布局在最低可及绩效底线下仍受容量卡住。",
                     bottleneck_plot,
                     outputs,
                 )

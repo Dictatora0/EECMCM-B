@@ -9,7 +9,7 @@ from alias_maps import add_canonical_metric_alias_columns, canonicalize_scheme_k
 from data_loader import MissingDataError, read_module_output
 from label_maps import pretty_metric_label, short_metric_label
 from layout_utils import load_distance_topology, parse_station_plan, station_size_value
-from plot_config import ROOT, get_plot_style
+from plot_config import ROOT, ensure_matplotlib_configured
 from plot_utils import PlotResult, generated_result, save_figure, skipped_result
 
 
@@ -161,7 +161,7 @@ def _load_scenario_summary() -> tuple[pd.DataFrame, list[str]]:
 
 def build_rq4_plots(export_formats: list[str]) -> list[PlotResult]:
     results: list[PlotResult] = []
-    style = get_plot_style()
+    style = ensure_matplotlib_configured()
 
     try:
         scenario_df, scenario_files = _load_scenario_summary()
@@ -199,7 +199,7 @@ def build_rq4_plots(export_formats: list[str]) -> list[PlotResult]:
         sns.barplot(data=money_wan, x="scenario", y="value", hue="metric", palette=style.colors[3:5], ax=axes[1, 1])
         axes[0, 0].set_title("覆盖与平均可及性")
         axes[0, 1].set_title("容量安全与最大利用率")
-        axes[1, 0].set_title("满意度优先方案绩效")
+        axes[1, 0].set_title("满意度优先方案可及绩效")
         axes[1, 1].set_title("财务量级指标")
         axes[1, 1].set_ylabel("金额 / 万元")
         for ax in axes.ravel():
@@ -214,7 +214,7 @@ def build_rq4_plots(export_formats: list[str]) -> list[PlotResult]:
                 "RQ4",
                 scenario_files,
                 "main_text",
-                "按覆盖、容量、公平、财务四组拆开，避免利润金额与比例指标同轴失真。",
+                "按覆盖、容量、满意度优先方案可及绩效与财务四组拆开，避免利润金额与比例指标同轴失真。",
                 pd.concat([served_long, safety_long, satisfaction_long, money_wan], ignore_index=True),
                 outputs,
             )
@@ -287,7 +287,7 @@ def build_rq4_plots(export_formats: list[str]) -> list[PlotResult]:
                 ax=axes[2],
             )
             axes[0].set_title("覆盖与平均可及性")
-            axes[1].set_title("安全率与公平底线")
+            axes[1].set_title("安全率与最低可及绩效")
             axes[2].set_title("年净利润")
             axes[2].set_ylabel("年净利润 / 万元")
             for ax in axes[:2]:
@@ -304,7 +304,7 @@ def build_rq4_plots(export_formats: list[str]) -> list[PlotResult]:
                     "RQ4",
                     scenario_files,
                     "main_text",
-                    "将预算提高前后的覆盖、底线公平和净利润拆开呈现，避免异质量纲挤在同一子图。",
+                    "将预算提高前后的覆盖、最低可及绩效和净利润拆开呈现，避免异质量纲挤在同一子图。",
                     pd.concat([s0s4_coverage, s0s4_safety, s0s4_money], ignore_index=True, sort=False),
                     outputs,
                 )
