@@ -374,6 +374,10 @@ def build_rq2_plots(export_formats: list[str]) -> list[PlotResult]:
                 "served_demand_coverage",
             ]
         )
+        coverage_display_label_map = {
+            "coverage_priority_baseline": "覆盖优先基准方案",
+        }
+        coverage["scheme_label_cn"] = coverage["scheme_label_cn"].replace(coverage_display_label_map)
         coverage_long = coverage.melt(id_vars="scheme_label_cn", var_name="metric", value_name="value")
         metric_label = {
             "geographic_population_coverage": "地理人口覆盖率",
