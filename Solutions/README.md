@@ -22,6 +22,8 @@ cd /Users/lifulin/Desktop/B
 bash run_full_pipeline.sh full
 ```
 
+`full` 现在会先清空旧 `outputs/`、统一生图结果和 `Solutions/RQ4/cache/`，再按当前主链口径从头重算；因此它就是项目的单命令复现实验入口。
+
 脚本内部按以下顺序执行：
 
 ```bash
@@ -107,7 +109,8 @@ python3 Solutions/plots/build_all_plots.py
   - 输出题面主结果 `3_1_best_price_scheme_*`；
   - 输出 `3_1_aux_financial_best_price_scheme_*` 与 `3_1_aux_satisfaction_best_price_scheme_*` 辅助扩展方案；
   - 输出固定点迭代轨迹、站点财务表和小区满意度/可及绩效表。
-  - 扩展输出逐站联合可行性绑定约束诊断。
+  - 扩展输出 `3_4_joint_feasibility_*` 逐站联合可行性绑定约束诊断。
+  - 扩展输出 `3_5_satisfaction_objective_*` 站点—服务项目级定价搜索结果。
   - 同脚本支持站点—服务项目级扩搜：
     `python3 Solutions/RQ3/3_1.py --expanded-search-only --scenarios S0,S4 --search-levels light,medium,heavy --price-grid full --keep-near-boundary --random-seed 42`
 - 下游依赖：
@@ -115,7 +118,7 @@ python3 Solutions/plots/build_all_plots.py
 - 说明文档：
   - [RQ3 接口与口径说明](./RQ3/README.md)
   - 输出位置：`Solutions/RQ3/outputs/`
-- 其中 `3_1_best_price_scheme_*` 为主结果；`3_1_aux_*`、`3_2_aux_*` 为辅助扩展结果。
+- 其中 `3_1_best_price_scheme_*` 为主结果；`3_1_aux_*`、`3_2_aux_*`、`3_4_joint_feasibility_*`、`3_5_satisfaction_objective_*` 为辅助扩展结果。
 
 ### 兼容命名
 
@@ -184,14 +187,14 @@ RQ1 high-precision outputs
 关键默认输入链如下：
 
 - RQ2 <- RQ1
-  - `1_1_high_precision_year5_population.csv`
-  - `1_3_high_precision_adjusted_demand.csv`
-  - `1_3_high_precision_adjusted_demand_detail.csv`
+  - `Solutions/RQ1/outputs/1_1_high_precision_year5_population.csv`
+  - `Solutions/RQ1/outputs/1_3_high_precision_adjusted_demand.csv`
+  - `Solutions/RQ1/outputs/1_3_high_precision_adjusted_demand_detail.csv`
 
 - RQ3 <- RQ2 + RQ1
-  - `2_1_best_scheme_summary.csv`
-  - `2_1_best_scheme_stations.csv`
-  - `2_1_best_scheme_allocations.csv`
+  - `Solutions/RQ2/outputs/2_1_best_scheme_summary.csv`
+  - `Solutions/RQ2/outputs/2_1_best_scheme_stations.csv`
+  - `Solutions/RQ2/outputs/2_1_best_scheme_allocations.csv`
   - RQ1 高精度人口与需求文件
 
 - RQ4 <- RQ1 + RQ2 + RQ3
@@ -204,7 +207,7 @@ RQ1 high-precision outputs
 ```bash
 cd /Users/lifulin/Desktop/B
 
-# 完整重跑
+# 从干净状态完整重跑
 bash run_full_pipeline.sh full
 
 # 只重建论文图表
@@ -216,7 +219,7 @@ bash run_full_pipeline.sh test
 # RQ3 扩搜：light + medium + heavy
 bash run_full_pipeline.sh rq3-expanded all
 
-# 清空所有 outputs、RQ4/cache 和缓存
+# 显式清空所有生成结果与缓存（通常只在想单独清理时使用）
 bash run_full_pipeline.sh clean
 ```
 
@@ -225,10 +228,7 @@ bash run_full_pipeline.sh clean
 ```bash
 cd /Users/lifulin/Desktop/B
 
-# 清空所有 outputs、RQ4/cache 和缓存
-bash run_full_pipeline.sh clean
-
-# 完整重跑，并包含 3 个算法升级扩展
+# 从干净状态完整重跑，并包含 3 个算法升级扩展
 bash run_full_pipeline.sh full
 
 # 只重建论文图表
@@ -259,7 +259,7 @@ bash run_full_pipeline.sh rq3-expanded extreme
 当前统一脚本支持的命令与作用如下：
 
 - `bash run_full_pipeline.sh full`
-  - 重算 RQ1 到 RQ4 的主结果与扩展结果，并在末尾自动执行 `Solutions/plots/build_all_plots.py`。
+  - 会先清空旧 outputs、旧图片结果和 RQ4 cache，再按当前主链重算 RQ1 到 RQ4 的主结果与扩展结果，并在末尾自动执行 `Solutions/plots/build_all_plots.py`。
 - `bash run_full_pipeline.sh plots`
   - 基于现有 `outputs/` 直接重建论文图、`plot_manifest.csv` 和 `plot_notes.md`。
 - `bash run_full_pipeline.sh test`
@@ -268,7 +268,7 @@ bash run_full_pipeline.sh rq3-expanded extreme
 - `bash run_full_pipeline.sh test-rq3`
   - 仅运行 `Solutions/RQ3/tests.py`。
 - `bash run_full_pipeline.sh clean`
-  - 清空 `Solutions/*/outputs/` 下的数值结果、统一生图图片、`plot_manifest.csv`、`plot_notes.md`、`.mplconfig`，以及 `Solutions/RQ4/cache/*.json` 和 `__pycache__`。
+  - 清空 `Solutions/*/outputs/` 下的数值结果、统一生图图片、`plot_manifest.csv`、`plot_notes.md`、`.mplconfig`，以及 `Solutions/RQ4/cache/` 下的缓存 JSON 和 `__pycache__`；保留各题 `outputs/README.md` 目录说明。
 - `bash run_full_pipeline.sh rq3-expanded {all|light|medium|heavy|extreme}`
   - 运行 RQ3 站点-服务级扩搜，默认针对 `S0,S4`。
 
@@ -288,7 +288,7 @@ bash run_full_pipeline.sh rq3-expanded extreme
 - 若修改了定价、补贴、利润率约束或固定点迭代参数，从 RQ3 开始重跑，并同步重跑 RQ4。
 - 若只修改了情景分析写法或情景参数，从 RQ4 开始重跑，但要确认是否需要联动触发 RQ1 至 RQ3 的重算。
 - 若只修改了图题、图注、图表筛选或版式映射，直接执行 `bash run_full_pipeline.sh plots`。
-- 若需要保证论文结果完全由当前代码重算得到，先执行 `bash run_full_pipeline.sh clean`，再执行 `bash run_full_pipeline.sh full`。
+- 若需要保证论文结果完全由当前代码重算得到，直接执行 `bash run_full_pipeline.sh full` 即可；它会先清缓存和旧结果。
 - `RQ4` 会拒绝复用不符合当前主模型口径的旧缓存，包括旧版 `alpha_j` 定价摘要、旧溢出分流结果和缺失主摘要键的缓存文件。
 - `bash run_full_pipeline.sh full` 会在数值结果后自动调用 `Solutions/plots/build_all_plots.py`，统一图产物写到 `Solutions/plots/outputs/`。
 - `bash run_full_pipeline.sh test` 当前也会覆盖 `Solutions/plots/tests.py`，用于守护图编号、标题、落位、字段口径和字体配置。
@@ -296,19 +296,23 @@ bash run_full_pipeline.sh rq3-expanded extreme
 
 ## 完整实验命令
 
-若你要从头跑完整实验并拿结果，直接执行：
+若你要按当前主链口径一键重现实验并拿结果，直接执行：
 
 ```bash
 cd /Users/lifulin/Desktop/B
 
-# 1. 清空已有数值输出、图片类结果和缓存
-bash run_full_pipeline.sh clean
-
-# 2. 重跑 RQ1 -> RQ4，并自动统一生图
+# 1. 从干净状态重跑 RQ1 -> RQ4，并自动统一生图
 bash run_full_pipeline.sh full
 
-# 3. 跑守护测试确认入口、图链路和题面口径一致
+# 2. 跑守护测试确认入口、图链路和题面口径一致
 bash run_full_pipeline.sh test
+```
+
+若只想先手动清空现有结果，再观察重算过程，可额外先执行：
+
+```bash
+cd /Users/lifulin/Desktop/B
+bash run_full_pipeline.sh clean
 ```
 
 运行完成后，结果主要在：
@@ -318,6 +322,7 @@ bash run_full_pipeline.sh test
 - `Solutions/RQ3/outputs/`
 - `Solutions/RQ4/outputs/`
 - `Solutions/plots/outputs/`
+- 各题 `outputs/README.md` 会同步说明当前目录下主结果、扩展结果和论文引用建议。
 
 如果只改了绘图层，不重算模型，直接执行：
 

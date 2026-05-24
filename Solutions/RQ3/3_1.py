@@ -1046,6 +1046,36 @@ def detect_two_cycle_oscillation(
     )
 
 
+def detect_short_cycle_oscillation(
+    history: List[Dict[str, float]],
+    max_cycle_length: int = 8,
+    tolerance: float = 1e-8,
+) -> int | None:
+    if len(history) < 4:
+        return None
+    upper = min(max_cycle_length, len(history) // 2)
+    for cycle_length in range(2, upper + 1):
+        previous_block = history[-2 * cycle_length:-cycle_length]
+        current_block = history[-cycle_length:]
+        communities = sorted(current_block[0])
+        if all(
+            all(abs(previous_block[idx][community] - current_block[idx][community]) <= tolerance for community in communities)
+            for idx in range(cycle_length)
+        ):
+            return cycle_length
+    return None
+
+
+def average_cycle_states(states: List[Dict[str, float]]) -> Dict[str, float]:
+    if not states:
+        return {}
+    communities = sorted(states[0])
+    return {
+        community: sum(state[community] for state in states) / len(states)
+        for community in communities
+    }
+
+
 def apply_damping(
     previous: Dict[str, float],
     candidate: Dict[str, float],
@@ -1377,6 +1407,7 @@ def evaluate_price_profile(
 
     old_satisfaction = initial_satisfaction or initial_service_satisfaction_by_community(inputs.q2_allocations)
     satisfaction_history: List[Dict[str, float]] = [old_satisfaction.copy()]
+    load_history: List[Dict[str, float]] = []
     iteration_trace: List[IterationRecord] = []
     station_financials: List[Dict[str, float]] = []
     community_results: List[Dict[str, float]] = []
@@ -1420,8 +1451,10 @@ def evaluate_price_profile(
             station_name: sum(station_raw_demand[station_name].values())
             for station_name in stations
         }
+        load_history.append(candidate_station_total_load.copy())
         iteration_damping_used = 0
-        if enable_damping and detect_two_cycle_oscillation(satisfaction_history + [candidate_satisfaction]):
+        cycle_length = detect_short_cycle_oscillation(satisfaction_history + [candidate_satisfaction])
+        if enable_damping and cycle_length is not None:
             new_satisfaction = apply_damping(
                 previous=old_satisfaction,
                 candidate=candidate_satisfaction,
@@ -1587,6 +1620,25 @@ def evaluate_price_profile(
             old_satisfaction = new_satisfaction
             satisfaction_history.append(new_satisfaction.copy())
             break
+        cycle_length = detect_short_cycle_oscillation(satisfaction_history + [new_satisfaction])
+        if cycle_length is not None:
+            averaged_satisfaction = average_cycle_states((satisfaction_history + [new_satisfaction])[-cycle_length:])
+            averaged_load = average_cycle_states(load_history[-cycle_length:])
+            old_satisfaction = averaged_satisfaction
+            state_station_total_load = {
+                station_name: float(averaged_load.get(station_name, state_station_total_load[station_name]))
+                for station_name in state_station_total_load
+            }
+            satisfaction_history.append(averaged_satisfaction.copy())
+            iteration_trace[-1] = IterationRecord(
+                iteration=iteration_trace[-1].iteration,
+                max_satisfaction_delta=0.0,
+                average_service_satisfaction=iteration_trace[-1].average_service_satisfaction,
+                feasible_station_count=iteration_trace[-1].feasible_station_count,
+                total_subsidy=iteration_trace[-1].total_subsidy,
+                damping_used=1,
+            )
+            break
         old_satisfaction = new_satisfaction
         satisfaction_history.append(new_satisfaction.copy())
 
@@ -1701,7 +1753,7 @@ def evaluate_price_profile(
                 / max(sum(populations[row["community"]].semi_disabled for row in community_results), 1e-9),
                 6,
             ),
-            "key_factor": "服务频次较高，价格与协同分流均会影响可及性",
+            "key_factor": "服务频次较高，对价格水平和主站容量约束更敏感",
         },
         {
             "group": "失能",
@@ -2849,6 +2901,15 @@ def sort_satisfaction_priority_evaluations(evaluations: List[PriceEvaluation]) -
 
 
 def select_financial_best(evaluations: List[PriceEvaluation]) -> PriceEvaluation:
+    converged_profit_compliant = [
+        item for item in evaluations
+        if item.converged == 1 and item.profit_compliant == 1
+    ]
+    if converged_profit_compliant:
+        return sort_financial_compliant_evaluations(converged_profit_compliant)[0]
+    converged = [item for item in evaluations if item.converged == 1]
+    if converged:
+        return sort_financial_compliant_evaluations(converged)[0]
     return sort_financial_compliant_evaluations(evaluations)[0]
 
 
@@ -2928,7 +2989,7 @@ def write_price_evaluation_bundle(prefix: str, item: PriceEvaluation) -> None:
         OUTPUT_DIR / f"{prefix}_stations.csv",
         [
             {
-                **row,
+                **{key: value for key, value in row.items() if key != "assigned_overflow_load"},
                 "annual_service_revenue": round(row["annual_service_revenue"], 2),
                 "annual_direct_cost": round(row["annual_direct_cost"], 2),
                 "annual_fixed_cost": round(row["annual_fixed_cost"], 2),
@@ -2950,7 +3011,11 @@ def write_price_evaluation_bundle(prefix: str, item: PriceEvaluation) -> None:
         OUTPUT_DIR / f"{prefix}_communities.csv",
         [
             {
-                **row,
+                **{
+                    key: value
+                    for key, value in row.items()
+                    if key not in {"overflow_station", "overflow_load_daily"}
+                },
                 "distance_satisfaction": round(row["distance_satisfaction"], 6),
                 "response_satisfaction": round(row["response_satisfaction"], 6),
                 "service_satisfaction": round(row["service_satisfaction"], 6),

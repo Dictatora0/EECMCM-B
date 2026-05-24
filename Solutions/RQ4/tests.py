@@ -303,10 +303,41 @@ def test_cache_is_current_accepts_current_single_station_payload() -> None:
         assert cache_is_current(path) is True
 
 
+def test_cache_is_current_rejects_unconverged_financial_main_payload() -> None:
+    current_payload = {
+        "cache_version": RQ4_COMMON.CACHE_VERSION,
+        "financial_best_summary": {
+            "pricing_model": "station_service_level_pricing",
+            "pricing_formula": "p_{j,r} independent for r=1,...,5; p_{j,6}=0",
+            "profit_compliant": 1,
+            "converged": 0,
+        },
+        "satisfaction_best_summary": {
+            "pricing_model": "station_service_level_pricing",
+            "pricing_formula": "p_{j,r} independent for r=1,...,5; p_{j,6}=0",
+            "profit_compliant": 0,
+            "converged": 1,
+        },
+        "financial_best_community_results": [{"community": "A", "overflow_station": ""}],
+        "satisfaction_best_community_results": [{"community": "A", "overflow_station": ""}],
+    }
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = Path(tmpdir) / "current.json"
+        path.write_text(json.dumps(current_payload, ensure_ascii=False), encoding="utf-8")
+        assert cache_is_current(path) is False
+
+
 def test_rq4_source_uses_single_station_ratio_wording() -> None:
     text = RQ4_MAIN_PATH.read_text(encoding="utf-8")
     assert "不再分流至第二站" in text
     assert "协同站点分流" not in text
+
+
+def test_rq4_q3_solver_uses_service_level_candidate_generation() -> None:
+    text = RQ4_MAIN_PATH.read_text(encoding="utf-8")
+    assert "generate_station_service_level_candidates(" in text
+    assert "compose_global_profiles_from_station_candidates(" in text
+    assert "enumerate_station_price_profiles(" not in text
 
 
 def test_build_unified_summary_rows_reads_canonical_satisfaction_stability_field() -> None:
@@ -383,6 +414,100 @@ def test_build_unified_summary_rows_reads_canonical_satisfaction_stability_field
     assert rows[0]["q3_satisfaction_scheme_performance_stability"] == 0.97
 
 
+def test_solve_rq2_under_scenario_keeps_s0_on_canonical_baseline_even_if_milp_differs() -> None:
+    import types
+
+    scenario = ScenarioDefinition("S0", "基准情景", {})
+    year5_rows = [{"community": "A", "elderly_total": 100.0}]
+    adjusted_rows = [{"community": "A", "service": "助餐", "adjusted_monthly_demand": 300.0}]
+
+    original_load_station_scales = RQ4_MAIN.RQ2_COMMON.load_station_scales
+    original_load_distance_matrix = RQ4_MAIN.RQ2_COMMON.load_distance_matrix
+    original_load_satisfaction_rules = RQ4_MAIN.RQ2_COMMON.load_satisfaction_rules
+    original_load_service_costs = RQ4_MAIN.RQ2_COMMON.load_service_costs
+    original_enumerate_cached = RQ4_MAIN.enumerate_cached_scheme_codes
+    original_evaluate_scheme = RQ4_MAIN.RQ2_COMMON.evaluate_scheme
+    original_sort = RQ4_MAIN.RQ2_COMMON.sort_scheme_evaluations
+    original_select_safe = RQ4_MAIN.RQ2_COMMON.select_safe_scheme
+    original_solve_location_milp = RQ4_MAIN.RQ2_COMMON.solve_location_milp
+
+    baseline_eval = types.SimpleNamespace(
+        tag="baseline",
+        stations=[types.SimpleNamespace(community="A", scale="大型")],
+        station_metrics=[],
+    )
+    safe_eval = types.SimpleNamespace(
+        tag="safe",
+        stations=[types.SimpleNamespace(community="A", scale="中型")],
+        station_metrics=[],
+    )
+    milp_eval = types.SimpleNamespace(
+        tag="milp",
+        stations=[types.SimpleNamespace(community="B", scale="小型")],
+        station_metrics=[],
+    )
+
+    try:
+        RQ4_MAIN.RQ2_COMMON.load_station_scales = lambda: {"大型": object()}
+        RQ4_MAIN.RQ2_COMMON.load_distance_matrix = lambda: {}
+        RQ4_MAIN.RQ2_COMMON.load_satisfaction_rules = lambda: {}
+        RQ4_MAIN.RQ2_COMMON.load_service_costs = lambda: {}
+        RQ4_MAIN.enumerate_cached_scheme_codes = lambda **kwargs: [("baseline",), ("other",)]
+        RQ4_MAIN.RQ2_COMMON.sort_scheme_evaluations = lambda evaluations: [baseline_eval]
+        RQ4_MAIN.RQ2_COMMON.select_safe_scheme = lambda evaluations: (safe_eval, 0.0)
+        RQ4_MAIN.RQ2_COMMON.solve_location_milp = lambda **kwargs: ("milp",)
+
+        def fake_evaluate_scheme(**kwargs):
+            scheme_code = kwargs["scheme_code"]
+            if scheme_code == ("milp",):
+                return milp_eval
+            return baseline_eval
+
+        RQ4_MAIN.RQ2_COMMON.evaluate_scheme = fake_evaluate_scheme
+
+        best, safe_best, feasible_count = RQ4_MAIN.solve_rq2_under_scenario(
+            scenario,
+            year5_population_rows=year5_rows,
+            adjusted_summary_rows=adjusted_rows,
+        )
+    finally:
+        RQ4_MAIN.RQ2_COMMON.load_station_scales = original_load_station_scales
+        RQ4_MAIN.RQ2_COMMON.load_distance_matrix = original_load_distance_matrix
+        RQ4_MAIN.RQ2_COMMON.load_satisfaction_rules = original_load_satisfaction_rules
+        RQ4_MAIN.RQ2_COMMON.load_service_costs = original_load_service_costs
+        RQ4_MAIN.enumerate_cached_scheme_codes = original_enumerate_cached
+        RQ4_MAIN.RQ2_COMMON.evaluate_scheme = original_evaluate_scheme
+        RQ4_MAIN.RQ2_COMMON.sort_scheme_evaluations = original_sort
+        RQ4_MAIN.RQ2_COMMON.select_safe_scheme = original_select_safe
+        RQ4_MAIN.RQ2_COMMON.solve_location_milp = original_solve_location_milp
+
+    assert best is baseline_eval
+    assert safe_best is safe_eval
+    assert feasible_count == 2
+
+
+def test_rq4_cache_is_current_rejects_pre_alignment_payload_without_baseline_source_tag() -> None:
+    payload = {
+        "cache_version": RQ4_COMMON.CACHE_VERSION,
+        "financial_best_summary": {
+            "pricing_model": "station_service_level_pricing",
+            "pricing_formula": "p_{j,r} independent for r=1,...,5; p_{j,6}=0",
+        },
+        "satisfaction_best_summary": {
+            "pricing_model": "station_service_level_pricing",
+            "pricing_formula": "p_{j,r} independent for r=1,...,5; p_{j,6}=0",
+        },
+        "financial_best_community_results": [{"community": "A", "overflow_station": ""}],
+        "satisfaction_best_community_results": [{"community": "A", "overflow_station": ""}],
+        "scenario": "S0",
+        "baseline_alignment_source": "",
+    }
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = Path(tmpdir) / "stale_s0.json"
+        path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        assert cache_is_current(path) is False
+
+
 def run_all_tests() -> None:
     tests = [
         test_scenario_config_contains_required_traceable_fields,
@@ -398,8 +523,12 @@ def run_all_tests() -> None:
         test_q3_summary_row_contains_coverage_fields,
         test_cache_is_current_rejects_legacy_alpha_and_overflow_payload,
         test_cache_is_current_accepts_current_single_station_payload,
+        test_cache_is_current_rejects_unconverged_financial_main_payload,
         test_rq4_source_uses_single_station_ratio_wording,
+        test_rq4_q3_solver_uses_service_level_candidate_generation,
         test_build_unified_summary_rows_reads_canonical_satisfaction_stability_field,
+        test_solve_rq2_under_scenario_keeps_s0_on_canonical_baseline_even_if_milp_differs,
+        test_rq4_cache_is_current_rejects_pre_alignment_payload_without_baseline_source_tag,
     ]
     for test in tests:
         test()

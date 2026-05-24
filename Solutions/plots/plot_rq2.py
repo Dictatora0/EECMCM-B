@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 import pandas as pd
 import seaborn as sns
+import math
 
 from data_loader import MissingDataError, read_first_existing
 from label_maps import pretty_metric_label, pretty_scheme_label
@@ -30,6 +31,9 @@ def _load_best_stations() -> tuple[pd.DataFrame, list[str]]:
             "station_community",
             "utilization",
             "scale",
+            "daily_capacity",
+            "assigned_primary_load",
+            "total_load",
             "annual_revenue",
             "annual_subsidy",
             "annual_direct_cost",
@@ -47,11 +51,10 @@ def _load_best_allocations() -> tuple[pd.DataFrame, list[str]]:
         required_columns=[
             "community",
             "primary_station",
-            "overflow_station",
             "service_access_performance",
             "demand_service_ratio",
             "primary_load_daily",
-            "overflow_load_daily",
+            "unmet_load_daily",
         ],
     )
     return frame, [str(path)]
@@ -62,9 +65,8 @@ def _build_service_flow_sankey(top_links: pd.DataFrame, style) -> object:
 
     communities = top_links["community"].tolist()
     primary_nodes = sorted({value for value in top_links["primary_station"].dropna().tolist() if value})
-    overflow_nodes = sorted({value for value in top_links["overflow_station"].dropna().tolist() if value})
     station_nodes = []
-    for station in primary_nodes + overflow_nodes:
+    for station in primary_nodes:
         if station not in station_nodes:
             station_nodes.append(station)
 
@@ -81,7 +83,6 @@ def _build_service_flow_sankey(top_links: pd.DataFrame, style) -> object:
     for _, row in top_links.iterrows():
         community_label = f"小区 {row['community']}"
         primary_station = str(row["primary_station"]) if pd.notna(row["primary_station"]) else ""
-        overflow_station = str(row["overflow_station"]) if pd.notna(row["overflow_station"]) else ""
 
         primary_value = float(row.get("primary_load_daily", 0.0))
         if primary_station and primary_value > 0:
@@ -89,15 +90,7 @@ def _build_service_flow_sankey(top_links: pd.DataFrame, style) -> object:
             targets.append(node_index[f"服务站 {primary_station}"])
             values.append(primary_value)
             link_colors.append("rgba(91,124,153,0.55)")
-            customdata.append("主站承接")
-
-        overflow_value = float(row.get("overflow_load_daily", 0.0))
-        if overflow_station and overflow_value > 0:
-            sources.append(node_index[community_label])
-            targets.append(node_index[f"服务站 {overflow_station}"])
-            values.append(overflow_value)
-            link_colors.append("rgba(192,138,90,0.55)")
-            customdata.append("协同溢出")
+            customdata.append("唯一主站承接")
 
     return go.Figure(
         data=[
@@ -121,7 +114,7 @@ def _build_service_flow_sankey(top_links: pd.DataFrame, style) -> object:
             )
         ]
     ).update_layout(
-        title="小区—服务站服务流向桑基图",
+        title="小区—服务站唯一主站服务承接图",
         font=dict(family=style.font_cn, size=12, color="#222222"),
         paper_bgcolor="white",
         plot_bgcolor="white",
@@ -226,13 +219,25 @@ def build_rq2_plots(export_formats: list[str]) -> list[PlotResult]:
 
     topology = load_distance_topology(DISTANCE_XLSX)
     plan = parse_station_plan(summary_df.loc[0, "scheme_detail"])
+    x_span = max(float(topology["x"].max()) - float(topology["x"].min()), 1.0)
+    y_span = max(float(topology["y"].max()) - float(topology["y"].min()), 1.0)
+    coverage_radius = 0.16 * math.hypot(x_span, y_span)
     fig, ax = plt.subplots(figsize=(style.figure_width + 0.6, style.figure_height + 0.8))
     ax.scatter(topology["x"], topology["y"], s=120, c="#cfd7de", edgecolors="#6b7280", linewidth=0.8, zorder=2)
     for _, row in topology.iterrows():
         community = row["community"]
         if community in plan:
-            radius = 0.22
-            ax.add_patch(Circle((row["x"], row["y"]), radius=radius, fill=False, linestyle="--", linewidth=1.0, edgecolor=style.colors[1], alpha=0.8))
+            ax.add_patch(
+                Circle(
+                    (row["x"], row["y"]),
+                    radius=coverage_radius,
+                    fill=False,
+                    linestyle="--",
+                    linewidth=1.0,
+                    edgecolor=style.colors[1],
+                    alpha=0.45,
+                )
+            )
             ax.scatter(row["x"], row["y"], s=station_size_value(plan[community]), c=style.colors[0], edgecolors="#374151", linewidth=1.0, zorder=4)
             ax.text(row["x"], row["y"], community, ha="center", va="center", fontsize=10, color="white", weight="bold", zorder=5)
         else:
@@ -257,7 +262,7 @@ def build_rq2_plots(export_formats: list[str]) -> list[PlotResult]:
         )
     )
 
-    nonzero_links = allocations_df[(allocations_df["primary_load_daily"] > 0) | (allocations_df["overflow_load_daily"] > 0)].copy()
+    nonzero_links = allocations_df[allocations_df["primary_load_daily"] > 0].copy()
     if len(nonzero_links) > 18:
         results.append(
             skipped_result(
@@ -274,8 +279,8 @@ def build_rq2_plots(export_formats: list[str]) -> list[PlotResult]:
         )
     else:
         top_links = nonzero_links.copy()
-        top_links["station_pair"] = top_links["primary_station"].fillna("") + "/" + top_links["overflow_station"].fillna("")
-        top_links = top_links.sort_values(["primary_load_daily", "overflow_load_daily"], ascending=False)
+        top_links["station_pair"] = top_links["primary_station"].fillna("")
+        top_links = top_links.sort_values(["primary_load_daily"], ascending=False)
         if len(top_links) <= 12:
             try:
                 sankey = _build_service_flow_sankey(top_links, style)
@@ -283,22 +288,21 @@ def build_rq2_plots(export_formats: list[str]) -> list[PlotResult]:
                 results.append(
                     generated_result(
                         "rq2_02",
-                        "小区—服务站服务流向桑基图",
+                        "小区—服务站唯一主站服务承接图",
                         "RQ2",
                         allocation_files,
                         "main_text",
-                        "优先使用静态桑基图展示小区到服务站的主站与溢出流向，信息密度更高。",
+                        "展示各小区需求仅流向满意度最高的唯一主服务站，符合题目单站选择口径。",
                         top_links,
                         outputs,
                     )
                 )
             except Exception:
                 fig, ax = plt.subplots(figsize=(style.figure_width + 0.8, style.figure_height + 0.4))
-                ax.barh(top_links["community"], top_links["primary_load_daily"], color=style.colors[0], label="主站承接")
-                ax.barh(top_links["community"], top_links["overflow_load_daily"], left=top_links["primary_load_daily"], color=style.colors[1], label="协同溢出")
+                ax.barh(top_links["community"], top_links["primary_load_daily"], color=style.colors[0], label="唯一主站承接")
                 for _, row in top_links.iterrows():
-                    ax.text(row["primary_load_daily"] + row["overflow_load_daily"] + 10, row["community"], row["station_pair"], va="center", fontsize=9)
-                ax.set_title("小区—服务站主站与协同站服务承接图")
+                    ax.text(row["primary_load_daily"] + 10, row["community"], row["station_pair"], va="center", fontsize=9)
+                ax.set_title("小区—服务站唯一主站服务承接图")
                 ax.set_xlabel("日服务承接量 / 次")
                 ax.set_ylabel("小区")
                 ax.legend(frameon=False)
@@ -306,22 +310,21 @@ def build_rq2_plots(export_formats: list[str]) -> list[PlotResult]:
                 results.append(
                     generated_result(
                         "rq2_02",
-                        "小区—服务站主站与协同站服务承接图",
+                        "小区—服务站唯一主站服务承接图",
                         "RQ2",
                         allocation_files,
                         "main_text",
-                        "Plotly 静态导出失败时自动回退为 Matplotlib 堆叠条图，避免构建中断。",
+                        "Plotly 静态导出失败时自动回退为 Matplotlib 条形图，仍保持唯一主站承接口径。",
                         top_links,
                         outputs,
                     )
                 )
         else:
             fig, ax = plt.subplots(figsize=(style.figure_width + 0.8, style.figure_height + 0.4))
-            ax.barh(top_links["community"], top_links["primary_load_daily"], color=style.colors[0], label="主站承接")
-            ax.barh(top_links["community"], top_links["overflow_load_daily"], left=top_links["primary_load_daily"], color=style.colors[1], label="协同溢出")
+            ax.barh(top_links["community"], top_links["primary_load_daily"], color=style.colors[0], label="唯一主站承接")
             for _, row in top_links.iterrows():
-                ax.text(row["primary_load_daily"] + row["overflow_load_daily"] + 10, row["community"], row["station_pair"], va="center", fontsize=9)
-            ax.set_title("小区—服务站主站与协同站服务承接图")
+                ax.text(row["primary_load_daily"] + 10, row["community"], row["station_pair"], va="center", fontsize=9)
+            ax.set_title("小区—服务站唯一主站服务承接图")
             ax.set_xlabel("日服务承接量 / 次")
             ax.set_ylabel("小区")
             ax.legend(frameon=False)
@@ -329,11 +332,11 @@ def build_rq2_plots(export_formats: list[str]) -> list[PlotResult]:
             results.append(
                 generated_result(
                     "rq2_02",
-                    "小区—服务站主站与协同站服务承接图",
+                    "小区—服务站唯一主站服务承接图",
                     "RQ2",
                     allocation_files,
                     "main_text",
-                    "链路数适中时可直接用堆叠条图；若静态桑基图过密则自动回退为该图。",
+                    "链路数适中时可直接用条形图展示唯一主站承接量，避免旧协同站口径混入正文。",
                     top_links,
                     outputs,
                 )

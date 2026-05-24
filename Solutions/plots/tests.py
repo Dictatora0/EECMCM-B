@@ -4,11 +4,60 @@ import os
 import subprocess
 import tempfile
 import warnings
+from contextlib import contextmanager
 
 
 _MPL_DIR = Path(__file__).resolve().parent / "outputs" / ".mplconfig"
 _MPL_DIR.mkdir(parents=True, exist_ok=True)
 os.environ.setdefault("MPLCONFIGDIR", str(_MPL_DIR))
+
+
+@contextmanager
+def temporary_plot_output_dirs():
+    import plot_config
+    import plot_utils
+
+    original_output_dir = plot_config.OUTPUT_DIR
+    original_png_dir = plot_config.PNG_DIR
+    original_pdf_dir = plot_config.PDF_DIR
+    original_svg_dir = plot_config.SVG_DIR
+    original_mpl_dir = plot_config.MPLCONFIGDIR
+
+    original_plot_utils_png_dir = plot_utils.PNG_DIR
+    original_plot_utils_pdf_dir = plot_utils.PDF_DIR
+    original_plot_utils_svg_dir = plot_utils.SVG_DIR
+
+    with tempfile.TemporaryDirectory() as tmp:
+        base = Path(tmp) / "plots_output"
+        png_dir = base / "png"
+        pdf_dir = base / "pdf"
+        svg_dir = base / "svg"
+        mpl_dir = base / ".mplconfig"
+        for path in (base, png_dir, pdf_dir, svg_dir, mpl_dir):
+            path.mkdir(parents=True, exist_ok=True)
+
+        plot_config.OUTPUT_DIR = base
+        plot_config.PNG_DIR = png_dir
+        plot_config.PDF_DIR = pdf_dir
+        plot_config.SVG_DIR = svg_dir
+        plot_config.MPLCONFIGDIR = mpl_dir
+        os.environ["MPLCONFIGDIR"] = str(mpl_dir)
+
+        plot_utils.PNG_DIR = png_dir
+        plot_utils.PDF_DIR = pdf_dir
+        plot_utils.SVG_DIR = svg_dir
+        try:
+            yield base
+        finally:
+            plot_config.OUTPUT_DIR = original_output_dir
+            plot_config.PNG_DIR = original_png_dir
+            plot_config.PDF_DIR = original_pdf_dir
+            plot_config.SVG_DIR = original_svg_dir
+            plot_config.MPLCONFIGDIR = original_mpl_dir
+            plot_utils.PNG_DIR = original_plot_utils_png_dir
+            plot_utils.PDF_DIR = original_plot_utils_pdf_dir
+            plot_utils.SVG_DIR = original_plot_utils_svg_dir
+            os.environ["MPLCONFIGDIR"] = str(original_mpl_dir)
 
 
 def test_find_output_file_prefers_priority_keywords() -> None:
@@ -578,13 +627,13 @@ def test_rq2_extension_plots_use_appendix_location_and_current_profit_field() ->
             encoding="utf-8",
         )
         (outputs / "2_1_best_scheme_stations.csv").write_text(
-            "station_community,utilization,scale,annual_revenue,annual_subsidy,annual_direct_cost,annual_fixed_cost,annual_depreciation,annual_net_profit\n"
-            "A,0.7,小型,100,10,50,20,5,35\n",
+            "station_community,utilization,scale,daily_capacity,assigned_primary_load,total_load,annual_revenue,annual_subsidy,annual_direct_cost,annual_fixed_cost,annual_depreciation,annual_net_profit\n"
+            "A,0.7,小型,1000,700,700,100,10,50,20,5,35\n",
             encoding="utf-8",
         )
         (outputs / "2_1_best_scheme_allocations.csv").write_text(
-            "community,primary_station,overflow_station,service_access_performance,demand_service_ratio,primary_load_daily,overflow_load_daily\n"
-            "A,A,,0.8,0.9,100,0\n",
+            "community,primary_station,service_access_performance,demand_service_ratio,primary_load_daily,unmet_load_daily\n"
+            "A,A,0.8,0.9,100,0\n",
             encoding="utf-8",
         )
         (outputs / "2_2_pareto_frontier.csv").write_text(
@@ -606,7 +655,8 @@ def test_rq2_extension_plots_use_appendix_location_and_current_profit_field() ->
             [{"community": "A", "x": 0.0, "y": 0.0}]
         )
         try:
-            results = plot_rq2.build_rq2_plots(["png"])
+            with temporary_plot_output_dirs():
+                results = plot_rq2.build_rq2_plots(["png"])
         finally:
             plot_rq2.RQ2_OUTPUT = original_output
             plot_rq2.DISTANCE_XLSX = original_distance
@@ -777,13 +827,13 @@ def test_rq2_loaders_enforce_plot_contract_fields() -> None:
         outputs = Path(tmp) / "Solutions" / "RQ2" / "outputs"
         outputs.mkdir(parents=True)
         (outputs / "2_1_best_scheme_stations.csv").write_text(
-            "station_community,utilization,scale,annual_revenue,annual_subsidy,annual_direct_cost,annual_fixed_cost,annual_depreciation,annual_net_profit\n"
-            "A,0.7,小型,100,10,50,20,5,35\n",
+            "station_community,utilization,scale,daily_capacity,assigned_primary_load,total_load,annual_revenue,annual_subsidy,annual_direct_cost,annual_fixed_cost,annual_depreciation,annual_net_profit\n"
+            "A,0.7,小型,1000,700,700,100,10,50,20,5,35\n",
             encoding="utf-8",
         )
         (outputs / "2_1_best_scheme_allocations.csv").write_text(
-            "community,primary_station,overflow_station,service_access_performance,demand_service_ratio,primary_load_daily,overflow_load_daily\n"
-            "A,A,,0.8,0.9,100,0\n",
+            "community,primary_station,service_access_performance,demand_service_ratio,primary_load_daily,unmet_load_daily\n"
+            "A,A,0.8,0.9,100,0\n",
             encoding="utf-8",
         )
         original_output = plot_rq2.RQ2_OUTPUT
@@ -797,7 +847,96 @@ def test_rq2_loaders_enforce_plot_contract_fields() -> None:
     assert "annual_revenue" in stations.columns
     assert "annual_subsidy" in stations.columns
     assert "primary_load_daily" in allocations.columns
-    assert "overflow_load_daily" in allocations.columns
+    assert "unmet_load_daily" in allocations.columns
+    assert "overflow_station" not in allocations.columns
+    assert "overflow_load_daily" not in allocations.columns
+    assert "assigned_overflow_load" not in stations.columns
+
+
+def test_rq2_main_plots_use_single_station_wording_and_multi_station_topology() -> None:
+    import pandas as pd
+    import plot_rq2
+
+    with tempfile.TemporaryDirectory() as tmp:
+        outputs = Path(tmp) / "Solutions" / "RQ2" / "outputs"
+        outputs.mkdir(parents=True)
+        (outputs / "2_1_best_scheme_summary.csv").write_text(
+            "scheme_detail,geographic_population_coverage,served_population_coverage,weighted_served_population_coverage,served_demand_coverage,scheme_type\n"
+            "A-大型;C-小型;E-大型,1.0,0.84,0.84,0.83,coverage_priority_baseline\n",
+            encoding="utf-8",
+        )
+        (outputs / "2_1_best_scheme_stations.csv").write_text(
+            "station_community,utilization,scale,daily_capacity,assigned_primary_load,total_load,annual_revenue,annual_subsidy,annual_direct_cost,annual_fixed_cost,annual_depreciation,annual_net_profit\n"
+            "A,1.0,大型,3000,1550,1550,100,10,50,20,5,35\n"
+            "C,1.0,小型,1000,1000,1000,80,8,40,18,4,26\n"
+            "E,1.0,大型,3000,2223,2223,110,11,55,22,5,39\n",
+            encoding="utf-8",
+        )
+        (outputs / "2_1_best_scheme_allocations.csv").write_text(
+            "community,primary_station,service_access_performance,demand_service_ratio,primary_load_daily,unmet_load_daily\n"
+            "A,A,0.87,0.99,850,0\n"
+            "B,A,0.82,0.99,700,0\n"
+            "C,C,0.49,0.56,649,0\n"
+            "D,C,0.45,0.56,351,0\n"
+            "E,E,0.76,0.87,840,0\n"
+            "F,E,0.74,0.87,452,0\n"
+            "G,E,0.74,0.87,931,0\n"
+            "H,A,,0.79,0.99,652,0\n"
+            "I,E,,0.74,0.87,777,0\n"
+            "J,A,,0.85,0.99,775,0\n",
+            encoding="utf-8",
+        )
+        (outputs / "2_1_safe_scheme_summary.csv").write_text(
+            "scheme_type,scheme_detail,geographic_population_coverage,served_population_coverage,weighted_served_population_coverage,served_demand_coverage\n"
+            "safety_priority,A-大型;C-小型;E-大型,1.0,0.84,0.84,0.83\n",
+            encoding="utf-8",
+        )
+        (outputs / "2_2_pareto_frontier.csv").write_text(
+            "scheme_label,served_population_coverage,weighted_served_population_coverage,served_demand_coverage,average_service_access_performance,minimum_service_access_performance,capacity_safety_rate,max_station_utilization,annual_net_profit_after_policy_subsidy,profit_compliant\n"
+            "pareto_1,0.84,0.84,0.83,0.72,0.45,0.0,1.0,-20000,0\n",
+            encoding="utf-8",
+        )
+        (outputs / "2_2_epsilon_constraint_summary.csv").write_text(
+            "epsilon_min_access_threshold,epsilon_feasible_count,average_service_access_performance,minimum_service_access_performance,annual_net_profit_after_policy_subsidy\n"
+            "0.4,10,0.7,0.5,-20000\n",
+            encoding="utf-8",
+        )
+        original_output = plot_rq2.RQ2_OUTPUT
+        original_distance = plot_rq2.DISTANCE_XLSX
+        original_topology = plot_rq2.load_distance_topology
+        plot_rq2.RQ2_OUTPUT = outputs
+        plot_rq2.DISTANCE_XLSX = outputs / "fake_distance.xlsx"
+        plot_rq2.load_distance_topology = lambda _path: pd.DataFrame(
+            [
+                {"community": "A", "x": 0.0, "y": 0.0},
+                {"community": "B", "x": 1.0, "y": 0.0},
+                {"community": "C", "x": 0.0, "y": 1.0},
+                {"community": "D", "x": 1.0, "y": 1.0},
+                {"community": "E", "x": 2.0, "y": 1.0},
+                {"community": "F", "x": 3.0, "y": 1.0},
+                {"community": "G", "x": 2.0, "y": 2.0},
+                {"community": "H", "x": 1.0, "y": 2.0},
+                {"community": "I", "x": 3.0, "y": 2.0},
+                {"community": "J", "x": 2.0, "y": 0.0},
+            ]
+        )
+        try:
+            with temporary_plot_output_dirs() as plot_dir:
+                results = plot_rq2.build_rq2_plots(["png"])
+                rq2_01 = plot_dir / "png" / "rq2_01_topology_layout.png"
+                rq2_02 = plot_dir / "png" / "rq2_02_service_flow.png"
+                assert rq2_01.exists()
+                assert rq2_02.exists()
+        finally:
+            plot_rq2.RQ2_OUTPUT = original_output
+            plot_rq2.DISTANCE_XLSX = original_distance
+            plot_rq2.load_distance_topology = original_topology
+
+    by_id = {item.figure_id: item for item in results}
+    assert by_id["rq2_01"].title_cn == "服务站拓扑布局与覆盖关系图"
+    assert by_id["rq2_02"].title_cn == "小区—服务站唯一主站服务承接图"
+    assert "唯一主站" in by_id["rq2_02"].reason
+    assert "协同站" not in by_id["rq2_02"].title_cn
 
 
 def test_rq3_stability_plot_keeps_epsilon_as_access_threshold() -> None:

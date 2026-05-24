@@ -59,7 +59,7 @@ BASELINE_PARAMETERS = {
     "budget_limit": 120.0,
 }
 CAPACITY_SAFE_THRESHOLD = 0.85
-CACHE_VERSION = "rq4_scenarios_v6"
+CACHE_VERSION = "rq4_scenarios_v8"
 PARAMETER_ALIASES = {
     "elder_growth_rate": "elderly_growth_rate",
     "self_to_semi": "p12",

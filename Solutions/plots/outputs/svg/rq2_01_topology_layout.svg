@@ -6,7 +6,7 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-05-24T20:14:35.476467</dc:date>
+    <dc:date>2026-05-24T21:53:40.979512</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -38,46 +38,46 @@ z
 " style="fill: #ffffff"/>
    </g>
    <g id="patch_3">
-    <path d="M 65.460637 342.2 
-C 65.49494 342.2 65.527844 342.19573 65.5521 342.188131 
-C 65.576356 342.180532 65.589985 342.170224 65.589985 342.159478 
-C 65.589985 342.148731 65.576356 342.138423 65.5521 342.130824 
-C 65.527844 342.123225 65.49494 342.118955 65.460637 342.118955 
-C 65.426333 342.118955 65.39343 342.123225 65.369174 342.130824 
-C 65.344917 342.138423 65.331289 342.148731 65.331289 342.159478 
-C 65.331289 342.170224 65.344917 342.180532 65.369174 342.188131 
-C 65.39343 342.19573 65.426333 342.2 65.460637 342.2 
-L 65.460637 342.2 
+    <path d="M 186.58349 342.2 
+C 220.146206 342.2 252.338799 337.660987 276.071224 329.582626 
+C 299.803648 321.504265 313.138256 310.546118 313.138256 299.12159 
+C 313.138256 287.697063 299.803648 276.738916 276.071224 268.660555 
+C 252.338799 260.582194 220.146206 256.043181 186.58349 256.043181 
+C 153.020774 256.043181 120.828181 260.582194 97.095757 268.660555 
+C 73.363332 276.738916 60.028724 287.697063 60.028724 299.12159 
+C 60.028724 310.546118 73.363332 321.504265 97.095757 329.582626 
+C 120.828181 337.660987 153.020774 342.2 186.58349 342.2 
+L 186.58349 342.2 
 z
-" clip-path="url(#pab40d49b1e)" style="fill: none; opacity: 0.8; stroke-dasharray: 3.7,1.6; stroke-dashoffset: 0; stroke: #c08a5a; stroke-linejoin: miter"/>
+" clip-path="url(#pc1332fbd29)" style="fill: none; opacity: 0.45; stroke-dasharray: 3.7,1.6; stroke-dashoffset: 0; stroke: #c08a5a; stroke-linejoin: miter"/>
    </g>
    <g id="patch_4">
-    <path d="M 45.466479 125.351272 
-C 45.500783 125.351272 45.533686 125.347003 45.557942 125.339404 
-C 45.582198 125.331805 45.595827 125.321497 45.595827 125.31075 
-C 45.595827 125.300003 45.582198 125.289695 45.557942 125.282096 
-C 45.533686 125.274497 45.500783 125.270228 45.466479 125.270228 
-C 45.432175 125.270228 45.399272 125.274497 45.375016 125.282096 
-C 45.35076 125.289695 45.337131 125.300003 45.337131 125.31075 
-C 45.337131 125.321497 45.35076 125.331805 45.375016 125.339404 
-C 45.399272 125.347003 45.432175 125.351272 45.466479 125.351272 
-L 45.466479 125.351272 
+    <path d="M 171.891897 169.071285 
+C 205.454613 169.071285 237.647206 164.532272 261.37963 156.453911 
+C 285.112055 148.37555 298.446663 137.417403 298.446663 125.992875 
+C 298.446663 114.568348 285.112055 103.610201 261.37963 95.53184 
+C 237.647206 87.453479 205.454613 82.914466 171.891897 82.914466 
+C 138.329181 82.914466 106.136588 87.453479 82.404164 95.53184 
+C 58.671739 103.610201 45.337131 114.568348 45.337131 125.992875 
+C 45.337131 137.417403 58.671739 148.37555 82.404164 156.453911 
+C 106.136588 164.532272 138.329181 169.071285 171.891897 169.071285 
+L 171.891897 169.071285 
 z
-" clip-path="url(#pab40d49b1e)" style="fill: none; opacity: 0.8; stroke-dasharray: 3.7,1.6; stroke-dashoffset: 0; stroke: #c08a5a; stroke-linejoin: miter"/>
+" clip-path="url(#pc1332fbd29)" style="fill: none; opacity: 0.45; stroke-dasharray: 3.7,1.6; stroke-dashoffset: 0; stroke: #c08a5a; stroke-linejoin: miter"/>
    </g>
    <g id="patch_5">
-    <path d="M 277.058153 71.349156 
-C 277.092457 71.349156 277.12536 71.344886 277.149616 71.337287 
-C 277.173873 71.329688 277.187502 71.31938 277.187502 71.308633 
-C 277.187502 71.297887 277.173873 71.287579 277.149616 71.27998 
-C 277.12536 71.272381 277.092457 71.268111 277.058153 71.268111 
-C 277.02385 71.268111 276.990947 71.272381 276.96669 71.27998 
-C 276.942434 71.287579 276.928805 71.297887 276.928805 71.308633 
-C 276.928805 71.31938 276.942434 71.329688 276.96669 71.337287 
-C 276.990947 71.344886 277.02385 71.349156 277.058153 71.349156 
-L 277.058153 71.349156 
+    <path d="M 342.064139 125.956819 
+C 375.626855 125.956819 407.819448 121.417806 431.551873 113.339445 
+C 455.284297 105.261084 468.618905 94.302937 468.618905 82.87841 
+C 468.618905 71.453882 455.284297 60.495735 431.551873 52.417374 
+C 407.819448 44.339013 375.626855 39.8 342.064139 39.8 
+C 308.501423 39.8 276.30883 44.339013 252.576406 52.417374 
+C 228.843981 60.495735 215.509373 71.453882 215.509373 82.87841 
+C 215.509373 94.302937 228.843981 105.261084 252.576406 113.339445 
+C 276.30883 121.417806 308.501423 125.956819 342.064139 125.956819 
+L 342.064139 125.956819 
 z
-" clip-path="url(#pab40d49b1e)" style="fill: none; opacity: 0.8; stroke-dasharray: 3.7,1.6; stroke-dashoffset: 0; stroke: #c08a5a; stroke-linejoin: miter"/>
+" clip-path="url(#pc1332fbd29)" style="fill: none; opacity: 0.45; stroke-dasharray: 3.7,1.6; stroke-dashoffset: 0; stroke: #c08a5a; stroke-linejoin: miter"/>
    </g>
    <g id="matplotlib.axis_1">
     <g id="text_1">
@@ -91,7 +91,7 @@ z
    </g>
    <g id="PathCollection_1">
     <defs>
-     <path id="m4c71a101ae" d="M 0 5.477226 
+     <path id="mcf0c1be616" d="M 0 5.477226 
 C 1.452577 5.477226 2.845856 4.900111 3.872983 3.872983 
 C 4.900111 2.845856 5.477226 1.452577 5.477226 0 
 C 5.477226 -1.452577 4.900111 -2.845856 3.872983 -3.872983 
@@ -103,17 +103,17 @@ C -2.845856 4.900111 -1.452577 5.477226 0 5.477226
 z
 " style="stroke: #6b7280; stroke-width: 0.8"/>
     </defs>
-    <g clip-path="url(#pab40d49b1e)">
-     <use xlink:href="#m4c71a101ae" x="65.460637" y="342.159478" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
-     <use xlink:href="#m4c71a101ae" x="133.004243" y="263.458089" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
-     <use xlink:href="#m4c71a101ae" x="45.466479" y="125.31075" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
-     <use xlink:href="#m4c71a101ae" x="417.140873" y="223.614955" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
-     <use xlink:href="#m4c71a101ae" x="277.058153" y="71.308633" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
-     <use xlink:href="#m4c71a101ae" x="522.173494" y="39.8" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
-     <use xlink:href="#m4c71a101ae" x="371.23952" y="116.593599" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
-     <use xlink:href="#m4c71a101ae" x="362.505411" y="261.95975" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
-     <use xlink:href="#m4c71a101ae" x="336.805115" y="159.333933" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
-     <use xlink:href="#m4c71a101ae" x="220.19679" y="228.455127" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
+    <g clip-path="url(#pc1332fbd29)">
+     <use xlink:href="#mcf0c1be616" x="186.58349" y="299.12159" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
+     <use xlink:href="#mcf0c1be616" x="236.214147" y="236.287603" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
+     <use xlink:href="#mcf0c1be616" x="171.891897" y="125.992875" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
+     <use xlink:href="#mcf0c1be616" x="444.996123" y="204.477453" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
+     <use xlink:href="#mcf0c1be616" x="342.064139" y="82.87841" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
+     <use xlink:href="#mcf0c1be616" x="522.173494" y="57.722397" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
+     <use xlink:href="#mcf0c1be616" x="411.26807" y="119.033235" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
+     <use xlink:href="#mcf0c1be616" x="404.850297" y="235.091351" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
+     <use xlink:href="#mcf0c1be616" x="385.965866" y="153.156466" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
+     <use xlink:href="#mcf0c1be616" x="300.282733" y="208.341772" style="fill: #cfd7de; stroke: #6b7280; stroke-width: 0.8"/>
     </g>
    </g>
    <g id="patch_6">
@@ -127,42 +127,42 @@ L 546.015313 24.68
 " style="fill: none; stroke: #555555; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="patch_8">
-    <path d="M 21.495313 357.32 
+    <path d="M 21.495312 357.32 
 L 546.015313 357.32 
 " style="fill: none; stroke: #555555; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="patch_9">
-    <path d="M 21.495313 24.68 
+    <path d="M 21.495312 24.68 
 L 546.015313 24.68 
 " style="fill: none; stroke: #555555; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="text_3">
-    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #111827" x="133.004243" y="266.362777" transform="rotate(-0 133.004243 266.362777)">B</text>
+    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #111827" x="236.214147" y="239.19229" transform="rotate(-0 236.214147 239.19229)">B</text>
    </g>
    <g id="text_4">
-    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #111827" x="417.140873" y="226.519643" transform="rotate(-0 417.140873 226.519643)">D</text>
+    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #111827" x="444.996123" y="207.38214" transform="rotate(-0 444.996123 207.38214)">D</text>
    </g>
    <g id="text_5">
-    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #111827" x="522.173494" y="42.704687" transform="rotate(-0 522.173494 42.704687)">F</text>
+    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #111827" x="522.173494" y="60.627085" transform="rotate(-0 522.173494 60.627085)">F</text>
    </g>
    <g id="text_6">
-    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #111827" x="371.23952" y="119.498287" transform="rotate(-0 371.23952 119.498287)">G</text>
+    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #111827" x="411.26807" y="121.937923" transform="rotate(-0 411.26807 121.937923)">G</text>
    </g>
    <g id="text_7">
-    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #111827" x="362.505411" y="264.864437" transform="rotate(-0 362.505411 264.864437)">H</text>
+    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #111827" x="404.850297" y="237.996039" transform="rotate(-0 404.850297 237.996039)">H</text>
    </g>
    <g id="text_8">
-    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #111827" x="336.805115" y="162.238621" transform="rotate(-0 336.805115 162.238621)">I</text>
+    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #111827" x="385.965866" y="156.061153" transform="rotate(-0 385.965866 156.061153)">I</text>
    </g>
    <g id="text_9">
-    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #111827" x="220.19679" y="231.350439" transform="rotate(-0 220.19679 231.350439)">J</text>
+    <text style="font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #111827" x="300.282733" y="211.237084" transform="rotate(-0 300.282733 211.237084)">J</text>
    </g>
    <g id="text_10">
     <text style="font-size: 14px; font-family: 'Songti SC'; text-anchor: middle" x="283.755313" y="18.68" transform="rotate(-0 283.755313 18.68)">服务站拓扑布局与覆盖关系图</text>
    </g>
    <g id="PathCollection_2">
     <defs>
-     <path id="m15269acde9" d="M 0 10.246951 
+     <path id="m6ea8748fdd" d="M 0 10.246951 
 C 2.717523 10.246951 5.324109 9.167267 7.245688 7.245688 
 C 9.167267 5.324109 10.246951 2.717523 10.246951 0 
 C 10.246951 -2.717523 9.167267 -5.324109 7.245688 -7.245688 
@@ -174,13 +174,13 @@ C -5.324109 9.167267 -2.717523 10.246951 0 10.246951
 z
 " style="stroke: #374151"/>
     </defs>
-    <g clip-path="url(#pab40d49b1e)">
-     <use xlink:href="#m15269acde9" x="65.460637" y="342.159478" style="fill: #5b7c99; stroke: #374151"/>
+    <g clip-path="url(#pc1332fbd29)">
+     <use xlink:href="#m6ea8748fdd" x="186.58349" y="299.12159" style="fill: #5b7c99; stroke: #374151"/>
     </g>
    </g>
    <g id="PathCollection_3">
     <defs>
-     <path id="mceb139a73d" d="M 0 7.416198 
+     <path id="m68e7d33629" d="M 0 7.416198 
 C 1.966799 7.416198 3.853307 6.634781 5.244044 5.244044 
 C 6.634781 3.853307 7.416198 1.966799 7.416198 0 
 C 7.416198 -1.966799 6.634781 -3.853307 5.244044 -5.244044 
@@ -192,28 +192,28 @@ C -3.853307 6.634781 -1.966799 7.416198 0 7.416198
 z
 " style="stroke: #374151"/>
     </defs>
-    <g clip-path="url(#pab40d49b1e)">
-     <use xlink:href="#mceb139a73d" x="45.466479" y="125.31075" style="fill: #5b7c99; stroke: #374151"/>
+    <g clip-path="url(#pc1332fbd29)">
+     <use xlink:href="#m68e7d33629" x="171.891897" y="125.992875" style="fill: #5b7c99; stroke: #374151"/>
     </g>
    </g>
    <g id="PathCollection_4">
-    <g clip-path="url(#pab40d49b1e)">
-     <use xlink:href="#m15269acde9" x="277.058153" y="71.308633" style="fill: #5b7c99; stroke: #374151"/>
+    <g clip-path="url(#pc1332fbd29)">
+     <use xlink:href="#m6ea8748fdd" x="342.064139" y="82.87841" style="fill: #5b7c99; stroke: #374151"/>
     </g>
    </g>
    <g id="text_11">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #ffffff" x="65.460637" y="345.064165" transform="rotate(-0 65.460637 345.064165)">A</text>
+    <text style="font-weight: 700; font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #ffffff" x="186.58349" y="302.026278" transform="rotate(-0 186.58349 302.026278)">A</text>
    </g>
    <g id="text_12">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #ffffff" x="45.466479" y="128.215437" transform="rotate(-0 45.466479 128.215437)">C</text>
+    <text style="font-weight: 700; font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #ffffff" x="171.891897" y="128.897563" transform="rotate(-0 171.891897 128.897563)">C</text>
    </g>
    <g id="text_13">
-    <text style="font-weight: 700; font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #ffffff" x="277.058153" y="74.213321" transform="rotate(-0 277.058153 74.213321)">E</text>
+    <text style="font-weight: 700; font-size: 10px; font-family: 'Songti SC'; text-anchor: middle; fill: #ffffff" x="342.064139" y="85.783097" transform="rotate(-0 342.064139 85.783097)">E</text>
    </g>
   </g>
  </g>
  <defs>
-  <clipPath id="pab40d49b1e">
+  <clipPath id="pc1332fbd29">
    <rect x="21.495313" y="24.68" width="524.52" height="332.64"/>
   </clipPath>
  </defs>

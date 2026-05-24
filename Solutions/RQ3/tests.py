@@ -38,6 +38,8 @@ compute_price_satisfaction = RQ3_MAIN.compute_price_satisfaction
 meets_profit_rate_constraint = RQ3_MAIN.meets_profit_rate_constraint
 fixed_point_converged = RQ3_MAIN.fixed_point_converged
 detect_two_cycle_oscillation = RQ3_MAIN.detect_two_cycle_oscillation
+detect_short_cycle_oscillation = RQ3_MAIN.detect_short_cycle_oscillation
+average_cycle_states = RQ3_MAIN.average_cycle_states
 apply_damping = RQ3_MAIN.apply_damping
 evaluation_summary_row = RQ3_MAIN.evaluation_summary_row
 joint_feasible_solution_exists = RQ3_MAIN.joint_feasible_solution_exists
@@ -747,6 +749,29 @@ def test_detect_two_cycle_oscillation_finds_simple_abab_pattern() -> None:
     assert detect_two_cycle_oscillation(history, tolerance=1e-9)
 
 
+def test_detect_short_cycle_oscillation_finds_ababc_cycle() -> None:
+    history = [
+        {"A": 0.80, "B": 0.60},
+        {"A": 0.90, "B": 0.70},
+        {"A": 0.85, "B": 0.65},
+        {"A": 0.80, "B": 0.60},
+        {"A": 0.90, "B": 0.70},
+        {"A": 0.85, "B": 0.65},
+    ]
+    assert detect_short_cycle_oscillation(history, max_cycle_length=3, tolerance=1e-9) == 3
+
+
+def test_average_cycle_states_returns_componentwise_mean() -> None:
+    states = [
+        {"A": 0.80, "B": 0.60},
+        {"A": 0.90, "B": 0.70},
+        {"A": 0.85, "B": 0.65},
+    ]
+    averaged = average_cycle_states(states)
+    assert abs(averaged["A"] - 0.85) < 1e-9
+    assert abs(averaged["B"] - 0.65) < 1e-9
+
+
 def test_apply_damping_blends_candidate_with_previous_state() -> None:
     damped = apply_damping(
         previous={"A": 0.8, "B": 0.4},
@@ -1288,6 +1313,83 @@ def test_satisfaction_selector_prefers_converged_result_over_unconverged_referen
     assert satisfaction_best_selector([converged_but_unfair, non_converged_but_fairer]) is converged_but_unfair
 
 
+def test_select_financial_best_prefers_converged_profit_compliant_candidate() -> None:
+    profile = {
+        "A": {"助餐": 10.0, "日间照料": 10.0, "上门护理": 10.0, "康复理疗": 10.0, "助浴": 10.0, "紧急救助": 0.0},
+    }
+    unconverged_but_stronger = PriceEvaluation(
+        station_prices=profile,
+        iteration_count=30,
+        converged=0,
+        average_service_satisfaction=0.88,
+        minimum_service_satisfaction=0.82,
+        average_service_access_performance=0.78,
+        minimum_service_access_performance=0.72,
+        vulnerable_service_satisfaction=0.87,
+        annual_government_subsidy=1200.0,
+        annual_service_revenue=12000.0,
+        annual_direct_cost=9800.0,
+        annual_fixed_cost=1000.0,
+        annual_depreciation=500.0,
+        annual_total_cost=11300.0,
+        annual_net_profit_before_subsidy=700.0,
+        annual_net_profit_after_subsidy=1900.0,
+        annual_net_profit=1900.0,
+        profit_rate=1900.0 / 11300.0,
+        feasible_station_count=1,
+        profit_compliant=1,
+        satisfaction_compliant=1,
+        low_income_service_satisfaction=0.85,
+        low_income_served_coverage=0.9,
+        weighted_served_population_coverage=0.82,
+        served_demand_coverage=0.84,
+        damping_used=1,
+        iteration_trace=[IterationRecord(1, 0.02, 0.88, 1, 1200.0, 1)],
+        station_financials=[{"station_community": "A", "profit_rate": 0.06}],
+        community_results=[{"community": "A", "service_satisfaction": 0.82, "service_access_performance": 0.72}],
+        accessibility_groups=[],
+        gini_access=0.18,
+        theil_access=0.03,
+        max_min_gap=0.22,
+    )
+    converged_and_profit_compliant = PriceEvaluation(
+        station_prices=profile,
+        iteration_count=4,
+        converged=1,
+        average_service_satisfaction=0.81,
+        minimum_service_satisfaction=0.74,
+        average_service_access_performance=0.73,
+        minimum_service_access_performance=0.68,
+        vulnerable_service_satisfaction=0.8,
+        annual_government_subsidy=1000.0,
+        annual_service_revenue=11800.0,
+        annual_direct_cost=9800.0,
+        annual_fixed_cost=1000.0,
+        annual_depreciation=500.0,
+        annual_total_cost=11300.0,
+        annual_net_profit_before_subsidy=500.0,
+        annual_net_profit_after_subsidy=1500.0,
+        annual_net_profit=1500.0,
+        profit_rate=1500.0 / 11300.0,
+        feasible_station_count=1,
+        profit_compliant=1,
+        satisfaction_compliant=1,
+        low_income_service_satisfaction=0.78,
+        low_income_served_coverage=0.86,
+        weighted_served_population_coverage=0.78,
+        served_demand_coverage=0.8,
+        damping_used=0,
+        iteration_trace=[IterationRecord(1, 0.0, 0.81, 1, 1000.0, 0)],
+        station_financials=[{"station_community": "A", "profit_rate": 0.05}],
+        community_results=[{"community": "A", "service_satisfaction": 0.74, "service_access_performance": 0.68}],
+        accessibility_groups=[],
+        gini_access=0.2,
+        theil_access=0.04,
+        max_min_gap=0.25,
+    )
+    assert select_financial_best([unconverged_but_stronger, converged_and_profit_compliant]) is converged_and_profit_compliant
+
+
 def test_joint_feasibility_station_direction_labels_profit_boundaries() -> None:
     path = Path(__file__).resolve().parent / "3_4_joint_feasibility_diagnostics.py"
     spec = spec_from_file_location("rq3_joint_diag_test_module", path)
@@ -1481,6 +1583,8 @@ def run_all_tests() -> None:
         test_profit_rate_constraint_is_bounded_between_zero_and_eight_percent,
         test_fixed_point_converged_uses_max_absolute_difference,
         test_detect_two_cycle_oscillation_finds_simple_abab_pattern,
+        test_detect_short_cycle_oscillation_finds_ababc_cycle,
+        test_average_cycle_states_returns_componentwise_mean,
         test_apply_damping_blends_candidate_with_previous_state,
         test_select_primary_and_backup_follows_utility_order,
         test_build_community_choices_breaks_ties_by_distance_then_station_name,
@@ -1493,6 +1597,7 @@ def run_all_tests() -> None:
         test_equity_metrics_capture_dispersion_and_extremes,
         test_assign_pareto_ranks_uses_non_dominated_front_layers,
         test_satisfaction_selector_prefers_converged_result_over_unconverged_reference,
+        test_select_financial_best_prefers_converged_profit_compliant_candidate,
         test_joint_feasibility_station_direction_labels_profit_boundaries,
     ]
     for test in tests:

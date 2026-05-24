@@ -14,10 +14,10 @@ RQ3 默认读取问题2主方案：
 
 RQ3 只允许读取 RQ1 高精度文件：
 
-- `rq1_high_precision_metadata.json`
-- `1_1_high_precision_year5_population.csv`
-- `1_3_high_precision_adjusted_demand.csv`
-- `1_3_high_precision_adjusted_demand_detail.csv`
+- `Solutions/RQ1/outputs/rq1_high_precision_metadata.json`
+- `Solutions/RQ1/outputs/1_1_high_precision_year5_population.csv`
+- `Solutions/RQ1/outputs/1_3_high_precision_adjusted_demand.csv`
+- `Solutions/RQ1/outputs/1_3_high_precision_adjusted_demand_detail.csv`
 
 ## 2. 四类核心量
 
@@ -138,25 +138,27 @@ RQ3 只允许读取 RQ1 高精度文件：
 RQ3 当前输出分成两层：
 
 - 主结果：`3_1_best_price_scheme_*`
-  这是题面主模型的标准输出，正文应优先引用这一组文件。
+  这是题面主模型的标准输出，正文应优先引用这一组文件。若 `3_1_aux_scheme_status_summary.csv` 中 `joint_feasible_solution_exists = 0`，则该组文件只能表述为“主模型下的代表性最优候选”，不能写成“已同时满足全部联合可行硬约束的唯一最优解”。
 - 辅助扩展：`3_1_aux_financial_best_price_scheme_*`、`3_1_aux_satisfaction_best_price_scheme_*`、`3_1_aux_pareto_frontier.csv`、`3_1_aux_dual_scheme_comparison.csv`
   这些文件只用于扩展比较、附录或补充分析，不覆盖主结果。
 
 辅助扩展中的满意度优先方案若未收敛或不满足利润率约束，只能作为参考方案解释，不能写成“题目唯一最优方案”。
 
-若不存在同时满足：
+若辅助诊断层中不存在同时满足：
 
 - `profit_compliant = 1`
 - `minimum_service_satisfaction >= 阈值`
 - `converged = 1`
 
-的方案，则输出：
+的候选方案，则输出：
 
 - `joint_feasible_solution_exists = false`
 
 并在汇总中明确写出：
 
 “在当前预算、补贴上限和服务需求下，调价无法同时实现财务合规与满意度阈值，需要追加补贴、扩容或专项公益服务补贴。”
+
+这里的 `joint_feasible_solution_exists` 属于辅助诊断与扩展筛选口径，不等于 `3_1_best_price_scheme_*` 主结果文件本身自动代表“联合可行最优解”。
 
 ## 11. 辅助图表输出文件名前缀
 
@@ -196,6 +198,7 @@ RQ3 当前输出分成两层：
 若需要完整对照表，请直接查看：
 
 - [兼容字段矩阵](../compatibility_matrix.md)
-- `3_2_aux_satisfaction_tradeoff_paper_notes.md`
+- [RQ3 outputs README](./outputs/README.md)
+- `Solutions/RQ3/outputs/3_2_aux_satisfaction_tradeoff_paper_notes.md`
 
-是论文和复核时最常用的四个文件；`service_access_performance` 仍会保留在这些文件中，但仅作为辅助可及绩效指标解释。
+其中 `outputs/README.md` 用于查看当前问题3产物目录结构；`service_access_performance` 仍会保留在这些文件中，但仅作为辅助可及绩效指标解释。

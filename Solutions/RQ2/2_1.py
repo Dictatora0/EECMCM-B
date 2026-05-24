@@ -79,7 +79,6 @@ def write_scheme_bundle(prefix: str, item, extra_fields: dict | None = None) -> 
                 "scale": metric.scale,
                 "daily_capacity": round(metric.daily_capacity, 4),
                 "assigned_primary_load": round(metric.assigned_primary_load, 4),
-                "assigned_overflow_load": round(metric.assigned_overflow_load, 4),
                 "total_load": round(metric.total_load, 4),
                 "utilization": round(metric.utilization, 6),
                 "annual_service_revenue": round(metric.annual_service_revenue, 2),
@@ -105,7 +104,6 @@ def write_scheme_bundle(prefix: str, item, extra_fields: dict | None = None) -> 
             {
                 "community": allocation.community,
                 "primary_station": allocation.primary_station or "",
-                "overflow_station": allocation.overflow_station or "",
                 "geographic_reachable": allocation.geographic_reachable,
                 "actually_served": allocation.actually_served,
                 "geographic_population_covered": round(allocation.geographic_population_covered, 4),
@@ -116,7 +114,6 @@ def write_scheme_bundle(prefix: str, item, extra_fields: dict | None = None) -> 
                 "demand_service_ratio": round(allocation.demand_service_ratio, 6),
                 "service_access_performance": round(allocation.service_access_performance, 6),
                 "primary_load_daily": round(allocation.primary_load, 4),
-                "overflow_load_daily": round(allocation.overflow_load, 4),
                 "unmet_load_daily": round(allocation.unmet_load, 4),
                 "geographic_satisfaction": round(allocation.geographic_satisfaction, 6),
                 "response_satisfaction": round(allocation.response_satisfaction, 6),

@@ -36,6 +36,7 @@ def load_distance_topology(distance_matrix_path: Path) -> pd.DataFrame:
         dissimilarity="precomputed",
         random_state=42,
         normalized_stress="auto",
+        n_init=4,
     )
     coords = embedding.fit_transform(frame.values)
     result = pd.DataFrame(coords, columns=["x", "y"], index=COMMUNITY_ORDER).reset_index()

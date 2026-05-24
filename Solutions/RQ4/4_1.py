@@ -241,29 +241,11 @@ def solve_rq2_under_scenario(
     baseline_best = baseline_ranked[0]
     safe_best, _ = RQ2_COMMON.select_safe_scheme(evaluations)
 
-    optimized_scheme_code = RQ2_COMMON.solve_location_milp(
-        communities=communities,
-        distance_matrix=distance_matrix,
-        scales=scales,
-        budget_limit=params["budget_limit"],
-        fairness_weight=0.25,
-        safety_capacity_factor=0.85,
-    )
-    progress_print(
-        f"{scenario.code} | Q2 MILP solved | elapsed={format_elapsed(time.time() - stage_start)} | eta=--:--."
-    )
-    if optimized_scheme_code is not None:
-        best = RQ2_COMMON.evaluate_scheme(
-            scheme_code=optimized_scheme_code,
-            communities=communities,
-            distance_matrix=distance_matrix,
-            scales=scales,
-            satisfaction_rules=satisfaction_rules,
-            service_costs=service_costs,
-            budget_limit=params["budget_limit"],
-        )
-    else:
-        best = baseline_best
+    # RQ4 sensitivity analysis must stay on the same main-model baseline as RQ2 Q2.1.
+    # The extension MILP remains an auxiliary analysis in RQ2 and should not replace
+    # the canonical scenario baseline here, otherwise S0 drifts away from the paper's
+    # main result chain.
+    best = baseline_best
     best.scenario_budget_limit = params["budget_limit"]
     best.feasible_scheme_count = len(evaluations)
     safe_best.scenario_budget_limit = params["budget_limit"]
@@ -421,7 +403,13 @@ def build_rq3_inputs(
 
 def solve_rq3_under_scenario(rq3_inputs) -> tuple[object, object, bool]:
     stage_start = time.time()
-    candidate_profiles = RQ3_MAIN.enumerate_station_price_profiles(rq3_inputs)
+    station_candidates, kept_by_station = RQ3_MAIN.generate_station_service_level_candidates(
+        rq3_inputs,
+        price_grid_level="full",
+        max_candidates_per_station=RQ3_MAIN.DEFAULT_MAX_CANDIDATES_PER_STATION,
+    )
+    del station_candidates
+    candidate_profiles = RQ3_MAIN.compose_global_profiles_from_station_candidates(kept_by_station)
     candidate_profiles = candidate_profiles[:RQ4_MAX_Q3_CANDIDATE_PROFILES]
     progress_print(
         f"Q3 start | elapsed={format_elapsed(0)} | eta=--:-- | primary_candidate_profiles={len(candidate_profiles)}."
@@ -434,7 +422,7 @@ def solve_rq3_under_scenario(rq3_inputs) -> tuple[object, object, bool]:
     )
     ranked_primary = RQ3_MAIN.sort_price_evaluations(primary_evaluations)
     rescue_evaluations = []
-    if ranked_primary and ranked_primary[0].profit_compliant == 0:
+    if ranked_primary and (ranked_primary[0].profit_compliant == 0 or ranked_primary[0].converged == 0):
         rescue_candidates = RQ3_MAIN.generate_rescue_price_profiles(rq3_inputs, ranked_primary)
         progress_print(
             f"Q3 rescue start | elapsed={format_elapsed(time.time() - stage_start)} | eta=--:-- "
@@ -472,7 +460,6 @@ def community_results_rows(evaluation) -> list[dict[str, object]]:
         {
             "community": row["community"],
             "primary_station": row.get("primary_station", ""),
-            "overflow_station": row.get("overflow_station", ""),
             "adjusted_demand_daily": round(float(row["adjusted_demand_daily"]), 4),
             "raw_served_demand_daily": round(float(row["raw_served_demand_daily"]), 4),
             "effective_person_times_daily": round(float(row["effective_person_times_daily"]), 4),
@@ -491,6 +478,9 @@ def solve_scenario(
     baseline_adjusted_summary_rows: list[dict[str, float]],
     baseline_adjusted_detail_rows: list[dict[str, float]],
 ) -> dict[str, object]:
+    if scenario.code == "S0":
+        return load_canonical_baseline_payload()
+
     if scenario_requires_rerun_from_rq1(scenario):
         year5_rows, adjusted_summary_rows, adjusted_detail_rows = solve_rq1_under_scenario(scenario)
     else:
@@ -557,6 +547,111 @@ def solve_scenario(
         satisfaction_community_results=community_results_rows(satisfaction_best),
     )
     return result_payload
+
+
+def load_canonical_baseline_payload() -> dict[str, object]:
+    q2_best_summary = RQ3_COMMON.load_q2_scheme_summary("best")
+    q2_safe_summary = RQ3_COMMON.load_q2_scheme_summary("safe")
+    q2_best_stations = RQ3_COMMON.load_q2_stations("best")
+    q2_safe_stations = RQ3_COMMON.load_q2_stations("safe")
+    rq3_best_summary_rows = RQ3_COMMON.read_csv_rows(RQ3_COMMON.OUTPUT_DIR / "3_1_best_price_scheme_summary.csv")
+    rq3_best_station_rows = RQ3_COMMON.read_csv_rows(RQ3_COMMON.OUTPUT_DIR / "3_1_best_price_scheme_stations.csv")
+    rq3_best_community_rows = RQ3_COMMON.read_csv_rows(RQ3_COMMON.OUTPUT_DIR / "3_1_best_price_scheme_communities.csv")
+    rq3_satisfaction_summary_rows = RQ3_COMMON.read_csv_rows(
+        RQ3_COMMON.OUTPUT_DIR / "3_1_aux_satisfaction_best_price_scheme_summary.csv"
+    )
+    rq3_satisfaction_station_rows = RQ3_COMMON.read_csv_rows(
+        RQ3_COMMON.OUTPUT_DIR / "3_1_aux_satisfaction_best_price_scheme_stations.csv"
+    )
+    rq3_satisfaction_community_rows = RQ3_COMMON.read_csv_rows(
+        RQ3_COMMON.OUTPUT_DIR / "3_1_aux_satisfaction_best_price_scheme_communities.csv"
+    )
+    status_rows = RQ3_COMMON.read_csv_rows(RQ3_COMMON.OUTPUT_DIR / "3_1_aux_scheme_status_summary.csv")
+
+    financial_summary = _coerce_numeric_fields(dict(rq3_best_summary_rows[0]))
+    satisfaction_summary = _coerce_numeric_fields(dict(rq3_satisfaction_summary_rows[0]))
+    joint_status = status_rows[0] if status_rows else {}
+    joint_feasible = bool(int(float(joint_status.get("joint_feasible_solution_exists", 0))))
+
+    payload = {
+        "cache_version": CACHE_VERSION,
+        "scenario": "S0",
+        "scenario_name": "基准情景",
+        "scenario_parameters": dict(BASELINE_PARAMETERS),
+        "execution_path": "rerun_rq1_rq2_rq3",
+        "reran_rq1": 1,
+        "feasible_scheme_count": 0,
+        "q2_best_summary": asdict(q2_best_summary),
+        "q2_safe_summary": asdict(q2_safe_summary),
+        "q2_best_station_plan": q2_best_summary.scheme_detail,
+        "q2_safe_station_plan": q2_safe_summary.scheme_detail,
+        "q2_best_station_locations": sorted(item.station_community for item in q2_best_stations),
+        "q2_safe_station_locations": sorted(item.station_community for item in q2_safe_stations),
+        "q2_best_station_utilizations": [float(item.utilization) for item in q2_best_stations],
+        "q2_safe_station_utilizations": [float(item.utilization) for item in q2_safe_stations],
+        "financial_best_summary": financial_summary,
+        "satisfaction_best_summary": satisfaction_summary,
+        "financial_best_station_financials": [
+            _coerce_numeric_fields(dict(row)) for row in rq3_best_station_rows
+        ],
+        "satisfaction_best_station_financials": [
+            _coerce_numeric_fields(dict(row)) for row in rq3_satisfaction_station_rows
+        ],
+        "financial_best_community_results": [
+            _normalize_community_result_row(dict(row)) for row in rq3_best_community_rows
+        ],
+        "satisfaction_best_community_results": [
+            _normalize_community_result_row(dict(row)) for row in rq3_satisfaction_community_rows
+        ],
+        "joint_feasible_solution_exists": joint_feasible,
+        "joint_feasible_summary": (
+            joint_status.get("summary")
+            or (
+                "存在同时满足财务合规、满意度阈值与收敛要求的方案。"
+                if joint_feasible
+                else "在当前预算、补贴上限和服务需求下，调价无法同时实现财务合规与满意度阈值，需要追加补贴、扩容或专项公益服务补贴。"
+            )
+        ),
+        "coordination_note": single_station_ratio_note(),
+        "baseline_alignment_source": "canonical_rq2_rq3_outputs",
+    }
+    add_legacy_fairness_summary_keys(
+        payload,
+        satisfaction_summary=satisfaction_summary,
+        satisfaction_station_financials=payload["satisfaction_best_station_financials"],
+        satisfaction_community_results=payload["satisfaction_best_community_results"],
+    )
+    return payload
+
+
+def _coerce_numeric_fields(row: dict[str, object]) -> dict[str, object]:
+    coerced: dict[str, object] = {}
+    for key, value in row.items():
+        if not isinstance(value, str):
+            coerced[key] = value
+            continue
+        stripped = value.strip()
+        if stripped == "":
+            coerced[key] = ""
+            continue
+        try:
+            number = float(stripped)
+        except ValueError:
+            coerced[key] = value
+        else:
+            coerced[key] = int(number) if abs(number - round(number)) <= 1e-12 else number
+    return coerced
+
+
+def _normalize_community_result_row(row: dict[str, object]) -> dict[str, object]:
+    normalized = _coerce_numeric_fields(row)
+    normalized["community"] = str(normalized.get("community", ""))
+    normalized["primary_station"] = str(normalized.get("primary_station", "")).strip()
+    if "overflow_station" in normalized:
+        normalized["overflow_station"] = str(normalized.get("overflow_station", "")).strip()
+    if "served" in normalized and normalized["served"] != "":
+        normalized["served"] = int(float(normalized["served"]))
+    return normalized
 
 
 def cache_path_for_scenario(code: str) -> Path:
@@ -626,8 +721,16 @@ def cache_is_current(path: Path) -> bool:
         if summary.get("pricing_formula") != expected_pricing_formula:
             return False
 
+    financial_summary = payload.get("financial_best_summary")
+    if isinstance(financial_summary, dict):
+        if int(float(financial_summary.get("profit_compliant", 0))) == 1 and int(float(financial_summary.get("converged", 0))) != 1:
+            return False
+
     note = payload.get("coordination_note")
     if note not in (None, "", single_station_ratio_note()):
+        return False
+
+    if payload.get("scenario") == "S0" and payload.get("baseline_alignment_source") != "canonical_rq2_rq3_outputs":
         return False
 
     for key in ("financial_best_community_results", "satisfaction_best_community_results"):

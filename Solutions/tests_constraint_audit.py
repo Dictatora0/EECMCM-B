@@ -1,5 +1,6 @@
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+import csv
 import sys
 
 
@@ -63,13 +64,22 @@ def test_run_full_pipeline_uses_python3_and_current_q3_chain() -> None:
     text = RUNNER_PATH.read_text(encoding="utf-8")
     assert "PYTHON_BIN" in text
     assert 'PYTHON_BIN="${PYTHON_BIN:-python3}"' in text
+    assert "clean_outputs" in text
+    assert "run_full()" in text
+    assert "clean_outputs\n" in text or "clean_outputs\r\n" in text
     assert "Solutions/RQ3/3_1.py" in text
     assert "Solutions/RQ3/3_4_joint_feasibility_diagnostics.py" in text
     assert "Solutions/plots/build_all_plots.py" in text
     assert "bash run_full_pipeline.sh plots" in text
     assert "Solutions/RQ4/tests.py" in text
     assert "find \"$ROOT_DIR/Solutions/RQ4/cache\"" in text
-    assert "3_5_satisfaction_objective" not in text
+
+
+def test_run_full_pipeline_clean_preserves_outputs_readme_files() -> None:
+    text = RUNNER_PATH.read_text(encoding="utf-8")
+    assert "outputs/README.md" in text
+    assert "! -name 'README.md'" in text
+    assert "find \"$ROOT_DIR/Solutions\" -type f -path '*/outputs/*'" in text
 
 
 def test_readmes_use_current_main_aux_q3_wording() -> None:
@@ -77,21 +87,41 @@ def test_readmes_use_current_main_aux_q3_wording() -> None:
     solutions_text = SOLUTIONS_README_PATH.read_text(encoding="utf-8")
     assert "3_1_best_price_scheme_*" in root_text
     assert "3_1_aux_financial_best_price_scheme_*" in root_text
-    assert "3_5_satisfaction_objective" not in root_text
-    assert "双方案比较" not in root_text
+    assert "3_5_satisfaction_objective_*" in root_text
     assert "3_1_best_price_scheme_*" in solutions_text
     assert "3_1_aux_financial_best_price_scheme_*" in solutions_text
-    assert "3_5_satisfaction_objective" not in solutions_text
+    assert "3_5_satisfaction_objective_*" in solutions_text
     assert "bash run_full_pipeline.sh plots" in root_text
     assert "bash run_full_pipeline.sh plots" in solutions_text
     assert "Solutions/plots/outputs/" in root_text
     assert "Solutions/plots/outputs/" in solutions_text
+    assert "bash run_full_pipeline.sh full" in root_text
+    assert "bash run_full_pipeline.sh full" in solutions_text
+    assert "会先清空旧 outputs、旧图片结果和 RQ4 cache，再按当前主链重算" in root_text
+    assert "会先清空旧 outputs、旧图片结果和 RQ4 cache，再按当前主链重算" in solutions_text
 
 
 def test_rq4_source_drops_coordination_diversion_wording() -> None:
     text = RQ4_README_TARGET_PATH.read_text(encoding="utf-8")
     assert "不再分流至第二站" in text
     assert "协同站点分流" not in text
+
+
+def test_main_csv_exports_drop_overflow_schema_fields() -> None:
+    csv_paths = [
+        SOLUTIONS_DIR / "RQ2" / "outputs" / "2_1_best_scheme_stations.csv",
+        SOLUTIONS_DIR / "RQ2" / "outputs" / "2_1_best_scheme_allocations.csv",
+        SOLUTIONS_DIR / "RQ3" / "outputs" / "3_1_best_price_scheme_communities.csv",
+        SOLUTIONS_DIR / "RQ3" / "outputs" / "3_1_best_price_scheme_stations.csv",
+        SOLUTIONS_DIR / "RQ4" / "outputs" / "4_1_q3_scenario_summary.csv",
+    ]
+    forbidden = {"assigned_overflow_load", "overflow_station", "overflow_load_daily"}
+    for path in csv_paths:
+        assert path.exists(), f"Missing expected output for audit: {path}"
+        with path.open(encoding="utf-8-sig") as handle:
+            reader = csv.DictReader(handle)
+            fieldnames = set(reader.fieldnames or [])
+        assert forbidden.isdisjoint(fieldnames), f"{path.name} still exports legacy overflow schema: {forbidden & fieldnames}"
 
 
 def run_all_tests() -> None:
@@ -101,8 +131,10 @@ def run_all_tests() -> None:
         test_constraint_audit_uses_split_q3_main_and_aux_paths,
         test_constraint_audit_checks_q3_service_level_pricing_formula,
         test_run_full_pipeline_uses_python3_and_current_q3_chain,
+        test_run_full_pipeline_clean_preserves_outputs_readme_files,
         test_readmes_use_current_main_aux_q3_wording,
         test_rq4_source_drops_coordination_diversion_wording,
+        test_main_csv_exports_drop_overflow_schema_fields,
     ]
     for test in tests:
         test()

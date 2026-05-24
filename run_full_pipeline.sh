@@ -17,7 +17,8 @@ Usage:
 
 Commands:
   full
-    Recompute RQ1 -> RQ4 baseline and extension results, then build unified plots.
+    Clean old outputs/caches first, then recompute RQ1 -> RQ4 current main-chain results
+    and extension outputs, and finally rebuild unified plots.
 
   plots
     Rebuild unified paper-ready figures under Solutions/plots/outputs from existing outputs.
@@ -31,7 +32,8 @@ Commands:
 
   clean
     Remove generated numeric outputs, plot images/manifests/notes, RQ4 cache files,
-    Matplotlib cache files under outputs/.mplconfig, and all __pycache__ directories.
+    Matplotlib cache files under outputs/.mplconfig, and all __pycache__ directories,
+    while preserving outputs/README.md directory guides.
 
   rq3-expanded [all|light|medium|heavy|extreme]
     Run the RQ3 expanded station-service pricing search for scenarios S0,S4.
@@ -44,10 +46,11 @@ EOF
 }
 
 clean_outputs() {
-  find "$ROOT_DIR/Solutions" -type f \( -path '*/outputs/*' -o -path '*/__pycache__/*' \) -delete
+  find "$ROOT_DIR/Solutions" -type f -path '*/outputs/*' ! -name 'README.md' -delete
+  find "$ROOT_DIR/Solutions" -type f -path '*/__pycache__/*' -delete
   find "$ROOT_DIR/Solutions" \( -type d -name '__pycache__' -o -path "$ROOT_DIR/Solutions/RQ3/outputs/.mplconfig" -o -path "$ROOT_DIR/Solutions/plots/outputs/.mplconfig" \) -exec rm -rf {} +
   find "$ROOT_DIR/Solutions/RQ4/cache" -type f -name '*.json' -delete
-  printf '[runner] cleaned outputs, plot artifacts, and caches\n'
+  printf '[runner] cleaned generated outputs, plot artifacts, and caches; kept outputs/README.md files\n'
 }
 
 ensure_test_prerequisites() {
@@ -68,7 +71,8 @@ ensure_test_prerequisites() {
 }
 
 run_full() {
-  printf '[runner] start full pipeline\n'
+  printf '[runner] start full pipeline from clean state\n'
+  clean_outputs
 
   "$PYTHON_BIN" "$ROOT_DIR/Solutions/RQ1/1_1.py"
   "$PYTHON_BIN" "$ROOT_DIR/Solutions/RQ1/1_2.py"
